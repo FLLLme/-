@@ -24,7 +24,7 @@ backend:
   #
   # 注意：这里只写到根地址，Decap 会自行拼接 /auth 与 /callback，
   # 不要手动加上 /callback 后缀，否则会拼成 /callback/callback。
-  base_url: https://my-blog-oauth.flllme-one.workers.dev
+  base_url: https://api.flllme.xyz
 
   # 自定义提交信息模板（可选，留空则用 Decap 默认值）
   commit_messages:

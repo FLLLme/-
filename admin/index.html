@@ -182,99 +182,70 @@
   if (location.protocol === 'file:') {
     showFileProtocolError();
   } else {
-    installRawGithubFallback();
+    installGithubApiFix();
     installOAuthShim();
     loadCMS(0);
   }
 
   /* ==========================================================================
-     raw.githubusercontent.com 请求改写层
+     GitHub API 请求修正层
 
      问题
      ----
-     Decap 读取「单个条目」的内容时，走的是 GitHub Contents API 返回的
-     download_url，即：
+     Decap 读写「单个条目」时会调用 getFileSha()，它这样拼 Git Trees API 的地址：
 
-         https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}
+         `${repoURL}/git/trees/${branch}:${encodeURIComponent(dirPath)}`
 
-     这个域名在国内网络会被拦截（实测直接 Failed to fetch），于是 Decap 拿到
-     空内容，解析时报 "Unrecognized front-matter format."，表现为：
-     列表能正常显示标题和日期，但点开文章所有字段都是空的。
+     注意 encodeURIComponent(dirPath) —— 目录路径里的 `/` 也被编码成了 %2F：
 
-     而完整内容其实就在 Contents API 的 base64 字段里，那条路径（api.github.com）
-     是通的——实测能正确解出文章原文。
+         .../git/trees/main:content%2Fposts   → 404 Not Found
+         .../git/trees/main:content/posts     → 200 OK（实测返回 6 个条目）
+
+     GitHub 不接受编码后的路径分隔符，请求 404，条目读写随之失败。
+     表现为：列表能正常显示标题和日期，但点开文章所有字段都是空的，
+     保存也无法进行。
+
+     为什么列表正常：列目录走的是 listFiles()，那里拼地址时没有做编码，
+     所以同一个文件夹，一个读得到、一个读不到。
 
      本层做的事
      ----------
-     把发往 raw.githubusercontent.com 的 fetch 请求改写成 api.github.com 的
-     Contents API 调用，取出 base64 内容解码后，以普通文本响应返回。
-     对调用方（Decap）完全透明，它拿到的仍是一段文件文本。
-
-     注意路径解析：仓库名是 `-`（一个连字符），所以要按「前两段是 owner/repo、
-     第三段是分支、其余是文件路径」来切分，不能用固定位置猜。
+     把发往 api.github.com 的 /git/trees/ 地址里的 %2F 还原成 /。
+     只还原路径分隔符，其余编码一律保留——文件名本身可能含需要编码的字符，
+     整体 decodeURIComponent 会把它们也解坏。
      ========================================================================== */
-  function installRawGithubFallback() {
-    var RAW_PREFIX = 'https://raw.githubusercontent.com/';
+  function installGithubApiFix() {
     var nativeFetch = window.fetch ? window.fetch.bind(window) : null;
     if (!nativeFetch) return;
 
-    /** base64（UTF-8）→ 文本。escape 虽已废弃，但这里是处理 UTF-8 的标准写法 */
-    function decodeB64Utf8(b64) {
-      try {
-        return decodeURIComponent(escape(window.atob(String(b64).replace(/\s/g, ''))));
-      } catch (err) {
-        return null;
-      }
-    }
+    var TREE_MARK = '/git/trees/';
 
-    /** 尽量取到登录令牌，避免 API 匿名调用的频率限制 */
-    function getToken() {
-      try {
-        for (var i = 0; i < localStorage.length; i++) {
-          var k = localStorage.key(i);
-          var m = (localStorage.getItem(k) || '').match(/"token"\s*:\s*"([^"]+)"/);
-          if (m) return m[1];
-        }
-      } catch (err) { /* 隐私模式下忽略 */ }
-      return null;
+    function fixTreeUrl(url) {
+      if (typeof url !== 'string') return url;
+      var at = url.indexOf(TREE_MARK);
+      if (at < 0) return url;
+
+      var head = url.slice(0, at + TREE_MARK.length);
+      var tail = url.slice(at + TREE_MARK.length);
+      if (!/%2F/i.test(tail)) return url;
+
+      return head + tail.replace(/%2F/gi, '/');
     }
 
     window.fetch = function (input, init) {
       var url = typeof input === 'string' ? input : (input && input.url) || '';
+      var fixed = fixTreeUrl(url);
 
-      if (url.indexOf(RAW_PREFIX) !== 0) {
-        return nativeFetch(input, init);
-      }
-
-      var seg = url.slice(RAW_PREFIX.length).split('/');
-      if (seg.length < 4) return nativeFetch(input, init);
-
-      var owner = seg[0], repo = seg[1], branch = seg[2];
-      var path = seg.slice(3).join('/');
-      var apiUrl = 'https://api.github.com/repos/' + owner + '/' + repo +
-                   '/contents/' + path + '?ref=' + branch;
-
-      var headers = { Accept: 'application/vnd.github+json' };
-      var token = getToken();
-      if (token) headers.Authorization = 'token ' + token;
+      if (fixed === url) return nativeFetch(input, init);
 
       if (window.console && console.info) {
-        console.info('[raw-gh-fallback] 改写请求 →', apiUrl);
+        console.info('[gh-api-fix] 修正路径分隔符：\n  ' + url + '\n  → ' + fixed);
       }
 
-      return nativeFetch(apiUrl, { headers: headers }).then(function (res) {
-        if (!res.ok) return res;
-        return res.json().then(function (data) {
-          var text = decodeB64Utf8(data.content || '');
-          if (text === null) {
-            return new Response('', { status: 500 });
-          }
-          return new Response(text, {
-            status: 200,
-            headers: { 'Content-Type': 'text/plain; charset=utf-8' }
-          });
-        });
-      });
+      if (typeof input === 'string') {
+        return nativeFetch(fixed, init);
+      }
+      return nativeFetch(new Request(fixed, input), init);
     };
   }
 

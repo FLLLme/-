@@ -227,31 +227,63 @@
       window.dispatchEvent(new MessageEvent('message', { data: data, origin: origin }));
     }
 
+    /** 日志，便于在控制台确认兼容层是否真的介入 */
+    function note() {
+      if (window.console && console.info) {
+        console.info.apply(console, ['[oauth-shim]'].concat([].slice.call(arguments)));
+      }
+    }
+
     window.addEventListener('message', function (event) {
-      if (typeof event.data !== 'string') return;
+      /* 只处理来自 OAuth 代理的消息 */
       if (event.origin !== PROXY_ORIGIN) return;
 
-      var raw = event.data.trim();
+      var raw = event.data;
+      var payload = null;
 
-      // 已经是标准协议格式 → 放行，不干预
-      if (raw.indexOf('authorization:') === 0 || raw.indexOf('authorizing:') === 0) return;
+      if (typeof raw === 'string') {
+        var text = raw.trim();
+        /* 已经是标准协议格式 → 放行，不干预 */
+        if (text.indexOf('authorization:') === 0 || text.indexOf('authorizing:') === 0) return;
 
-      var payload;
-      try { payload = JSON.parse(raw); } catch (err) { return; }
-      if (!payload || !payload.token) return;
+        /* 形态一：JSON 文本 */
+        try { payload = JSON.parse(text); } catch (err) { payload = null; }
 
-      // 补上 provider 字段，与官方 OAuth provider 的输出保持一致
+        /* 形态二：直接就是一串裸 token，例如 "gho_xxxxxxxx" */
+        if (!payload && /^(gho_|ghp_|ghs_|ghu_|github_pat_)[A-Za-z0-9_]+$/.test(text)) {
+          payload = { token: text };
+        }
+
+        if (!payload) {
+          note('收到无法识别的字符串消息，已忽略：', text.slice(0, 120));
+          return;
+        }
+      } else if (raw && typeof raw === 'object') {
+        /* 形态三：worker 直接 postMessage 一个对象（结构化克隆） */
+        payload = raw;
+      } else {
+        return;
+      }
+
+      if (!payload) return;
+
+      /* token 字段名容错：有的实现用 access_token */
+      var token = payload.token || payload.access_token;
+      if (!token) {
+        note('消息中找不到 token 字段，已忽略：', payload);
+        return;
+      }
+
+      payload.token = token;
       if (!payload.provider) payload.provider = 'github';
 
-      // 第一步：补发握手，让 Decap 注册结果监听器
+      /* 第一步：补发握手，让 Decap 注册结果监听器 */
       emit('authorizing:github', event.origin);
-      // 第二步：转发标准格式的结果
+      /* 第二步：转发标准格式的结果 */
       emit('authorization:github:success:' + JSON.stringify(payload), event.origin);
 
-      if (window.console) {
-        console.info('[oauth-shim] 已将 worker 的裸 token 转换为标准格式并补发握手');
-      }
-    }, true);   // 捕获阶段，确保先于 Decap 的监听器执行
+      note('已把 worker 的 token 转换为标准格式并补发握手');
+    }, true);   // 捕获阶段，尽量先于 Decap 的监听器执行
   }
 </script>
 

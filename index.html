@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ink & Logic · 关于前端工程、AI 应用与写作的长期笔记</title>
+<meta name="description" content="一个纯 HTML + CSS + JavaScript 实现的个人博客，文章以 Markdown 存储，集成 Twikoo 评论与 DeepSeek AI 问答。">
+<meta name="author" content="站长">
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%233d5af1'/%3E%3Ctext x='16' y='22' font-size='17' font-family='sans-serif' font-weight='bold' fill='white' text-anchor='middle'%3EI%3C/text%3E%3C/svg%3E">
+
+<!-- 主题预设：在样式加载前执行，避免深色模式闪白 -->
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem('blog.theme');
+      if (!t) t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  })();
+</script>
+
+<link rel="stylesheet" href="css/style.css">
+<!-- 代码高亮主题：两个样式表互斥启用，由 JS 根据当前主题切换 -->
+<link rel="stylesheet" id="hljs-light" href="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.9.0/styles/github.min.css">
+<link rel="stylesheet" id="hljs-dark" href="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.9.0/styles/github-dark.min.css" disabled>
+</head>
+<body>
+
+<header id="siteHeader"></header>
+
+<main>
+  <!-- Hero -->
+  <section class="hero">
+    <div class="container">
+      <span class="hero-badge"><span class="dot"></span> 持续更新中</span>
+      <h1>把复杂的问题，<em>写清楚</em>。</h1>
+      <p>
+        这里记录我在前端工程、AI 能力落地与工程写作上的实践与复盘。
+        所有文章以 Markdown 源文件存储，页面由原生 HTML、CSS 与 JavaScript 驱动。
+      </p>
+      <div class="hero-stats" id="heroStats"></div>
+    </div>
+  </section>
+
+  <div class="container">
+    <!-- 离线/加载失败提示 -->
+    <div class="offline-banner" id="offlineBanner"></div>
+
+    <!-- 工具栏 -->
+    <div class="toolbar" id="tags">
+      <div class="search-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input type="search" id="searchInput" placeholder="搜索标题、标签或正文…" autocomplete="off" aria-label="搜索文章">
+      </div>
+      <div class="tag-filter" id="tagFilter"></div>
+    </div>
+
+    <div class="result-hint" id="resultHint"></div>
+
+    <!-- 文章列表 -->
+    <section class="post-grid" id="postGrid" aria-live="polite">
+      <div class="skeleton"></div>
+      <div class="skeleton"></div>
+      <div class="skeleton"></div>
+    </section>
+  </div>
+</main>
+
+<footer id="siteFooter"></footer>
+
+<!-- 第三方库（按顺序 defer 执行；加载失败时页面自动使用内置回退实现） -->
+<script defer src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.9.0/highlight.min.js"></script>
+
+<!-- 站点脚本 -->
+<script defer src="js/config.js"></script>
+<script defer src="js/app.js"></script>
+<script defer src="js/md.js"></script>
+<script defer src="js/store.js"></script>
+<!-- 离线数据包（由 tools/bundle.py 生成；不存在时静默跳过） -->
+<script defer src="posts/bundle.js" onerror="void 0"></script>
+<script defer src="js/ai.js"></script>
+<script defer src="js/main.js"></script>
+</body>
+</html>

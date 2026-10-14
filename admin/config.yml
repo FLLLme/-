@@ -1,8 +1,9 @@
 # ============================================================================
 # Decap CMS 配置（原 Netlify CMS）
 #
-# 后台入口：https://<你的站点>/static/admin/
-# 本文件需与 index.html 放在同一目录，Decap 默认读取同级的 config.yml。
+# 后台入口：https://flllme.github.io/-/admin/
+# 本文件需与 index.html、decap-cms.js 放在同一目录，
+# Decap 默认读取与页面同级的 config.yml。
 #
 # 语法参考：https://decapcms.org/docs/configuration-options/
 # ============================================================================
@@ -85,12 +86,15 @@ collections:
     create: true
     delete: true
 
-    # 文件名模板。支持 {{slug}} {{year}} {{month}} {{day}} {{hour}} {{minute}} {{second}}
-    # 以及任意字段名。加日期前缀可保证唯一并让目录天然按时间排序。
-    slug: '{{year}}-{{month}}-{{day}}-{{slug}}'
+    # 文件名直接取「标题的 slug」，与目录里既有的文章风格保持一致。
+    # 之前用的是 '{{year}}-{{month}}-{{day}}-{{slug}}'（日期前缀模板），
+    # 它取的是条目创建时间而非 date 字段，会造出「文件名日期 ≠ 正文日期」的不一致。
+    slug: '{{slug}}'
 
     extension: md
-    format: frontmatter
+    # 明确写成 yaml-frontmatter：分隔符固定为 --- 且只解析 YAML。
+    # 裸写 frontmatter 时需要 Decap 自行探测格式，是多余的不确定性。
+    format: yaml-frontmatter
 
     # 列表视图的显示格式
     summary: '{{title}}　·　{{date}}'

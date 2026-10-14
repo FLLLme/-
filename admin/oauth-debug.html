@@ -165,10 +165,11 @@
 
   /* ---------------- ② 监听握手消息 ---------------- */
   window.addEventListener('message', function (e) {
-    var data = typeof e.data === 'string' ? e.data : JSON.stringify(e.data);
+    var kind = typeof e.data;
+    var data = kind === 'string' ? e.data : JSON.stringify(e.data);
     msgCount++;
     lastData = data;
-    log('MSG  origin=' + e.origin + '\n     data=' + data.slice(0, 220));
+    log('MSG  origin=' + e.origin + '\n     type=' + kind + '\n     data=' + String(data).slice(0, 220));
 
     var originOk = (e.origin === baseUrl);
     if (!originOk) {

@@ -71,8 +71,7 @@
   /* 主 CDN 失败时自动切换到备用 CDN。
      Decap 会在脚本执行时自动初始化，因此两种加载方式都可正常工作。 */
   var CMS_CDNS = [
-    'https://unpkg.com/decap-cms@^3.0.0/dist/decap-cms.js',
-    'https://cdn.jsdelivr.net/npm/decap-cms@^3.0.0/dist/decap-cms.js'
+    <script src="https://registry.npmmirror.com/decap-cms/latest/files/dist/decap-cms.js"></script>
   ];
 
   function loadCMS(i) {

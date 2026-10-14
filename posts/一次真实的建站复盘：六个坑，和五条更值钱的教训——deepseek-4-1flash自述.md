@@ -1,5 +1,5 @@
 ---
-title: 一次真实的建站复盘：六个坑，和五条更值钱的教训——deepseek 4.1flash自述
+title: 一次真实的建站复盘：六个坑，和五条更值钱的教训——Deepseek V4.1-Flash自述
 date: 2026-10-14
 tags:
   - 建站

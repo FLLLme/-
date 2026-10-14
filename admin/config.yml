@@ -133,3 +133,130 @@ collections:
         name: body
         widget: markdown
         hint: 支持标准 Markdown 语法
+
+  # ---------------------------------------------------------------------------
+  # 作品集
+  #
+  # 每个作品存成一个独立的 JSON 文件（content/works/xxx.json），后台左侧会
+  # 出现「作品集」栏目，可以像文章一样逐条新建、编辑、排序、删除。
+  #
+  # 为什么用 format: json 而不是 Markdown：
+  # 作品没有正文，只有结构化字段（图片、链接、简介）。用 JSON 可以让浏览器
+  # 直接解析，也避免把 JSON 塞进 front matter 那种别扭的写法。
+  #
+  # 发布后由 tools/sync_extras.py 汇总为 posts/works.json 供前端读取。
+  # ---------------------------------------------------------------------------
+  - name: works
+    label: 作品集
+    label_singular: 作品
+    description: '首页「作品集」区块。图片建议 16:10 横幅构图'
+
+    folder: content/works
+    create: true
+    delete: true
+
+    # 文件夹集合必须有一个 title 字段作为条目标识（生成文件名、列表显示都用它）
+    slug: '{{slug}}'
+
+    extension: json
+    format: json
+
+    summary: '{{title}}'
+    sortable_fields: ['order', 'date', 'title', 'commit_date']
+
+    fields:
+      - label: 作品名称
+        name: title
+        widget: string
+        hint: 显示在封面图下方
+
+      - label: 封面图
+        name: image
+        widget: image
+        required: false
+        hint: 点「选择文件」上传。建议 16:10（如 1600×1000），留空则显示灰色占位块
+
+      - label: 作品链接
+        name: href
+        widget: string
+        required: false
+        hint: 填了整张卡片可点击并在新标签打开，如 https://example.com。留空则不可点击
+
+      - label: 一句话简介
+        name: summary
+        widget: text
+        required: false
+        hint: 可选，显示在作品名称上方
+
+      - label: 创作日期
+        name: date
+        widget: datetime
+        date_format: YYYY-MM-DD
+        time_format: false
+        format: YYYY-MM-DD
+        required: false
+        hint: 用于排序，新作品在前。留空则排在有日期的作品之后
+
+      - label: 排序权重
+        name: order
+        widget: number
+        required: false
+        value_type: int
+        hint: 数字越小越靠前，留空按创作日期倒序。同一权重内按日期、名称排
+
+  # ---------------------------------------------------------------------------
+  # 朋友章（友链）
+  #
+  # 每个友链存成一个独立的 JSON 文件（content/friends/xxx.json）。
+  # 发布后由 tools/sync_extras.py 汇总为 posts/friends.json 供前端读取。
+  # ---------------------------------------------------------------------------
+  - name: friends
+    label: 朋友章
+    label_singular: 友链
+    description: '首页「朋友章」区块。点网名即跳转对方站点'
+
+    folder: content/friends
+    create: true
+    delete: true
+
+    # 用 name 作为条目标识，后台列表里显示的也是网名而不是文件名
+    identifier_field: name
+    slug: '{{slug}}'
+
+    extension: json
+    format: json
+
+    summary: '{{name}}'
+    sortable_fields: ['order', 'name', 'commit_date']
+
+    fields:
+      - label: 网名
+        name: name
+        widget: string
+        hint: 显示在友链列表里，也是后台的条目标识
+
+      - label: 头像
+        name: avatar
+        widget: image
+        required: false
+        hint: 正方形头像效果最好。留空则显示灰色圆形占位
+
+      - label: 站点地址
+        name: url
+        widget: string
+        required: false
+        hint: 填了点击网名即跳转，如 https://example.com
+
+      - label: 网站简介
+        name: desc
+        widget: text
+        required: false
+        hint: 显示在网名下方，一句话即可
+
+      - label: 排序权重
+        name: order
+        widget: number
+        required: false
+        value_type: int
+        hint: 数字越小越靠前，留空按网名排序
+

@@ -19,7 +19,8 @@
     controller: null,
     mode: 'unknown',      // 'proxy' | 'direct'
     proxyKeyAvailable: false,
-    greeted: false
+    greeted: false,
+    autoOpenedSettings: false
   };
 
   const defaults = () => ({
@@ -89,9 +90,10 @@
       <div class="ai-settings" id="aiSettings">
         <h4>AI 接口设置</h4>
         <p class="hint">
-          推荐使用随项目提供的同源代理（<code>python server.py</code>），
-          由服务端注入密钥，既规避浏览器 CORS 限制，也不会把 Key 暴露给访客。
-          浏览器直连模式仅建议在本地实验时使用。
+          <strong>本站未接入服务端代理</strong>（静态托管环境无法运行后端），
+          因此需要你提供自己的 DeepSeek API Key。Key 仅保存在你本机浏览器的
+          localStorage 中，不会上传到本站服务器。如果你是该站点的作者，建议部署
+          <code>deploy/cloudflare-worker.js</code> 作为共享代理，访客便无需自行配置。
         </p>
 
         <div class="field">
@@ -205,6 +207,17 @@
     el.drawer.classList.add('open');
     el.fab.style.display = 'none';
     if (!S.greeted) { greet(); S.greeted = true; }
+
+    // 静态托管（GitHub Pages 等）下不存在服务端代理，访客必须自备密钥，
+    // 否则聊天框是死的。首次打开时直接把设置面板推到面前。
+    const needKey = !settings.apiKey && (S.mode === 'direct'
+      || (S.mode === 'proxy' && !S.proxyKeyAvailable));
+    if (needKey && !S.autoOpenedSettings) {
+      S.autoOpenedSettings = true;
+      openSettings(true);
+      return;
+    }
+
     setTimeout(() => el.input.focus(), 120);
   }
 
@@ -228,10 +241,16 @@
 
   function greet() {
     if (!el.messages) return;
-    const text = S.context
-      ? `已加载《${S.context.title}》作为上下文（约 ${S.context.plainText.length} 字）。你可以直接提问，也可以点击下方快捷问题开始。`
-      : '你好，我是基于 DeepSeek 的问答助手。你可以问我关于本站文章的任何问题。';
-    addBubble('assistant', text, true);
+    const lines = [];
+    if (S.context) {
+      lines.push(`已加载《${S.context.title}》作为上下文（约 ${S.context.plainText.length} 字）。你可以直接提问，也可以点击下方快捷问题开始。`);
+    } else {
+      lines.push('你好，我是基于 DeepSeek 的问答助手。你可以问我关于本站文章的任何问题。');
+    }
+    if (!settings.apiKey && (S.mode === 'direct' || (S.mode === 'proxy' && !S.proxyKeyAvailable))) {
+      lines.push('\n\n> 当前站点未接入服务端代理，需要你提供自己的 DeepSeek API Key 才能对话。Key 只保存在你本机浏览器中，不会上传到本站。');
+    }
+    addBubble('assistant', lines.join(''), true);
   }
 
   /* ---------------- 状态提示 ---------------- */
@@ -254,8 +273,8 @@
     } else {
       cls = settings.apiKey ? 'ok' : 'warn';
       text = settings.apiKey
-        ? '直连模式 · 浏览器直接请求官方接口'
-        : '直连模式 · 尚未配置 API Key（点击右上角 ⚙ 设置）';
+        ? '直连模式 · 使用本机保存的 Key'
+        : '未检测到服务端代理（静态托管）· 请在设置中填写你自己的 API Key';
     }
 
     el.status.className = 'ai-status ' + cls;
@@ -428,6 +447,11 @@
     return S.mode === 'proxy' ? CFG.ai.proxyEndpoint : CFG.ai.directEndpoint;
   }
 
+  /** 由代理地址推导健康检查地址：…/chat → …/health */
+  function healthUrl() {
+    return String(CFG.ai.proxyEndpoint).replace(/\/(chat|completions)\/?$/i, '/health');
+  }
+
   /** 发起流式请求并按 SSE 协议解析增量 */
   async function streamChat(payload, onDelta, signal) {
     const headers = { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' };
@@ -519,7 +543,8 @@
   /* ---------------- 模式探测 ---------------- */
   async function detectMode() {
     try {
-      const res = await fetch(CFG.ai.healthEndpoint, { cache: 'no-store' });
+      // 静态托管（GitHub Pages 等）会对该路径返回 404 页面 → 自动回落到直连模式
+      const res = await fetch(healthUrl(), { cache: 'no-store' });
       if (!res.ok) throw new Error('no proxy');
       const info = await res.json().catch(() => ({}));
       S.mode = 'proxy';

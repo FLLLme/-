@@ -26,14 +26,28 @@ window.BLOG_CONFIG = {
   },
 
   /* ---------- DeepSeek AI 问答 ----------
-     proxyEndpoint : 同源代理接口，由随附的 server.py 提供
-                     （推荐，可规避浏览器 CORS 限制并隐藏 API Key）
-     directEndpoint: DeepSeek 官方接口，浏览器直连模式使用
-     endpoint      : 实际请求地址，留空则自动探测（先 proxy，失败回落 direct）
-     model         : deepseek-chat / deepseek-reasoner                          */
+     前端有两种工作模式，页面加载时自动探测：
+
+     [1] 代理模式（推荐，生产环境使用）
+         把请求发到你自己的服务端，由服务端注入密钥并流式转发。
+         这样既不受浏览器 CORS 限制，也不会把 API Key 暴露给访客。
+         · 本地开发：保持 proxyEndpoint = '/api/chat'（由 server.py 提供）
+         · 线上部署：填完整的代理地址，例如
+           proxyEndpoint: 'https://your-worker.workers.dev/api/chat'
+           健康检查地址会自动由 /chat 推导为 /health。
+         参见 deploy/cloudflare-worker.js（一键部署的免费代理）。
+
+     [2] 直连模式（仅在探测不到代理时回落）
+         浏览器直接请求 DeepSeek 官方接口，密钥保存在访客本机。
+         适合本地实验；公开部署意味着每位访客都要自己填 Key。
+
+     字段说明
+       proxyEndpoint : 代理接口地址（同源相对路径或完整 URL）
+       directEndpoint: DeepSeek 官方接口
+       endpoint      : 手动强制指定请求地址，留空则按模式自动选择
+       model         : deepseek-chat / deepseek-reasoner                     */
   ai: {
     proxyEndpoint: '/api/chat',
-    healthEndpoint: '/api/health',
     directEndpoint: 'https://api.deepseek.com/chat/completions',
     endpoint: '',
     model: 'deepseek-chat',

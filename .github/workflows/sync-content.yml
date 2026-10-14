@@ -1,0 +1,74 @@
+# ============================================================================
+# 同步 content/posts → posts/
+#
+# 用途
+#   本博客是纯静态站点，前端通过 posts/manifest.json 获知"有哪些文章"。
+#   而 Decap CMS 后台只会写内容文件（content/posts/*.md），无法维护这份清单。
+#   这个工作流负责在推送时补齐缺口：
+#     content/posts/  --(本工作流)-->  posts/*.md + posts/manifest.json
+#
+# 触发条件
+#   向 main 推送且 content/posts/ 内有改动；也支持在 Actions 页面手动触发。
+#
+# 为什么不会无限循环
+#   1) paths 只匹配 content/posts/**，而本工作流只改动 posts/**，不会再次触发自身；
+#   2) 提交信息带 [skip ci]；
+#   3) GitHub 规定用 GITHUB_TOKEN 推送的提交不会触发新的工作流运行。
+#   三重保险，任意一条生效都不会成环。
+#
+# 前置要求
+#   Settings → Actions → General → Workflow permissions
+#   选择 "Read and write permissions"，否则最后一步推送会失败。
+# ============================================================================
+
+name: Sync content to posts
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'content/posts/**'
+  workflow_dispatch:        # 允许在 Actions 页面手动运行
+
+permissions:
+  contents: write           # 需要写权限才能把生成结果推回仓库
+
+# 连续两次推送时串行执行，避免同时改写 posts/ 产生冲突
+concurrency:
+  group: sync-content
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: 生成 posts/ 与 manifest.json
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v4
+
+      - name: 准备 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 同步文章并重建 manifest.json
+        run: python tools/sync_content.py
+
+      - name: 重建离线数据包 bundle.js
+        run: python tools/bundle.py
+
+      - name: 提交并推送
+        run: |
+          git config user.name  'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+          git add -- posts
+
+          if git diff --cached --quiet; then
+            echo "posts/ 没有任何变化，跳过提交。"
+            exit 0
+          fi
+
+          git commit -m "chore(cms): 由 content/posts 同步生成 posts/ [skip ci]"
+          git push

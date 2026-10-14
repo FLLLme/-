@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>条目读取诊断</title>
+<style>
+  :root { --ok:#16a34a; --bad:#dc2626; --warn:#d97706; --muted:#6b7280; --border:#e4e7ee; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:26px; font:14.5px/1.75 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; color:#171a21; background:#f6f7f9; }
+  h1 { margin:0 0 6px; font-size:19px; }
+  h2 { margin:0 0 12px; font-size:15px; }
+  .sub { margin:0 0 18px; color:var(--muted); font-size:13px; }
+  .card { max-width:960px; margin:0 0 16px; padding:18px 20px; background:#fff; border:1px solid var(--border); border-radius:12px; }
+  code { padding:1px 5px; border:1px solid var(--border); border-radius:4px; background:#f2f4f7; font-family:"SFMono-Regular",Menlo,Consolas,monospace; font-size:.9em; word-break:break-all; }
+  button { padding:9px 18px; border:0; border-radius:9px; background:#3d5af1; color:#fff; font-size:14px; font-weight:600; cursor:pointer; margin-right:8px; }
+  button:hover { background:#5b78f6; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  #log { max-height:460px; overflow:auto; margin:14px 0 0; padding:12px 14px; background:#12151a; color:#e6edf3; border-radius:9px; font-family:"SFMono-Regular",Menlo,Consolas,monospace; font-size:12.5px; line-height:1.7; white-space:pre-wrap; word-break:break-all; }
+  .ok{color:var(--ok);font-weight:600;} .bad{color:var(--bad);font-weight:600;} .warn{color:var(--warn);font-weight:600;}
+  table { width:100%; border-collapse:collapse; font-size:13.5px; }
+  th,td { padding:7px 10px; border-bottom:1px solid var(--border); text-align:left; vertical-align:top; }
+  th { width:280px; color:var(--muted); font-weight:600; }
+</style>
+</head>
+<body>
+
+<h1>条目读取诊断</h1>
+<p class="sub">
+  本页只在你的浏览器里调用 GitHub API，<b>token 不会发送到任何第三方</b>。
+  用途：定位「后台打开文章所有字段为空」到底断在哪一步。
+  请先在后台登录，再运行本页。
+</p>
+
+<div class="card">
+  <h2>执行</h2>
+  <button id="run">开始检测</button>
+  <pre id="log">（点击上面按钮开始）</pre>
+</div>
+
+<div class="card">
+  <h2>检测项说明</h2>
+  <table>
+    <tr><th>① token</th><td>从 localStorage 取出登录令牌</td></tr>
+    <tr><th>② 目录列表</th><td>GitHub Contents API 列出 content/posts/</td></tr>
+    <tr><th>③ 读文件（base64）</th><td>Contents API 返回的 base64 内容能否正确解码 —— 这是 Decap 列表用的路径</td></tr>
+    <tr><th>④ 读文件（raw）</th><td>请求 Contents API 里给出的 download_url（指向 raw.githubusercontent.com）—— 这一步在国内网络常被拦截</td></tr>
+    <tr><th>⑤ 行首校验</th><td>文件内容是否以 <code>---</code> 开头（Decap 靠这个判断 front matter，否则报 Unrecognized front-matter format）</td></tr>
+  </table>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var REPO = 'FLLLme/-';
+  var BRANCH = 'main';
+  var SAMPLE = 'content/posts/hello-blog.md';
+  var logEl = document.getElementById('log');
+
+  function log(line) {
+    logEl.textContent = logEl.textContent === '（点击上面按钮开始）' ? line : logEl.textContent + '\n' + line;
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  /* ---- 找出 token：Decap 存在 localStorage，键名随版本略有不同 ---- */
+  function findToken() {
+    var keys = [];
+    for (var i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));
+    log('localStorage 共 ' + keys.length + ' 项：');
+    keys.forEach(function (k) { log('   · ' + k); });
+
+    for (var j = 0; j < keys.length; j++) {
+      var k = keys[j];
+      if (!/cms|decap|netlify/i.test(k)) continue;
+      try {
+        var v = JSON.parse(localStorage.getItem(k));
+        if (v && typeof v === 'object' && v.token) return v.token;
+      } catch (e) { /* 不是 JSON */ }
+    }
+    /* 兜底：任何一个 cms 相关的值里含 token 字段 */
+    for (var n = 0; n < keys.length; n++) {
+      var raw = localStorage.getItem(keys[n]) || '';
+      var m = raw.match(/"token"\s*:\s*"([^"]+)"/);
+      if (m) return m[1];
+    }
+    return null;
+  }
+
+  function api(path) {
+    return fetch('https://api.github.com/repos/' + REPO + '/contents/' + path + '?ref=' + BRANCH, {
+      headers: { Authorization: 'token ' + TOKEN, Accept: 'application/vnd.github+json' }
+    }).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
+  }
+
+  var TOKEN = null;
+
+  document.getElementById('run').addEventListener('click', function () {
+    this.disabled = true;
+    logEl.textContent = '（点击上面按钮开始）';
+    run();
+  });
+
+  function b64decode(str) {
+    try {
+      return decodeURIComponent(escape(atob(String(str).replace(/\s/g, ''))));
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function run() {
+    log('=== ① 取 token ===');
+    TOKEN = findToken();
+    if (!TOKEN) {
+      log('❌ 没找到 token —— 请先回到 /admin/ 登录成功后再运行本页');
+      return;
+    }
+    log('✅ 已取得 token（前 8 位 ' + TOKEN.slice(0, 8) + '…）');
+
+    log('');
+    log('=== ② 列出 content/posts/ ===');
+    api('content/posts').then(function (list) {
+      log('✅ 成功，共 ' + list.length + ' 个条目');
+      list.forEach(function (i) { log('   · ' + i.name + '  ' + i.size + ' B'); });
+
+      log('');
+      log('=== ③ 读文件（Contents API 的 base64 内容）===');
+      return api(SAMPLE);
+    }).then(function (file) {
+      log('文件名      : ' + file.name);
+      log('size        : ' + file.size);
+      log('encoding    : ' + file.encoding);
+      log('content 长度 : ' + (file.content ? file.content.length : '（缺失）'));
+      log('download_url: ' + (file.download_url || '（缺失）'));
+
+      var text = file.content ? b64decode(file.content) : null;
+      if (text === null) {
+        log('❌ base64 解码失败');
+      } else {
+        log('✅ base64 解码成功，共 ' + text.length + ' 字符');
+        log('   前 60 字符: ' + JSON.stringify(text.slice(0, 60)));
+        log('   ' + (text.indexOf('---') === 0
+          ? '✅ 内容以 --- 开头，front matter 格式正常'
+          : '❌ 内容不是以 --- 开头 —— 这正是 Decap 报 Unrecognized front-matter format 的原因'));
+      }
+
+      log('');
+      log('=== ④ 读文件（download_url → raw.githubusercontent.com）===');
+      if (!file.download_url) {
+        log('⚠️ 没有 download_url，跳过');
+        return null;
+      }
+      var host = file.download_url.replace(/^https?:\/\//, '').split('/')[0];
+      log('目标主机: ' + host);
+      var t0 = Date.now();
+      return fetch(file.download_url, { cache: 'no-store' })
+        .then(function (r) {
+          log('HTTP ' + r.status + '（耗时 ' + (Date.now() - t0) + ' ms）');
+          if (!r.ok) { log('❌ 这个地址不可用'); return null; }
+          return r.text();
+        })
+        .then(function (t) {
+          if (t === null) return null;
+          log('✅ 取到 ' + t.length + ' 字符');
+          log('   前 60 字符: ' + JSON.stringify(t.slice(0, 60)));
+          return null;
+        })
+        .catch(function (e) {
+          log('❌ 请求失败：' + e.message);
+          log('   → raw.githubusercontent.com 在国内网络经常被拦截。');
+          log('   → 如果 Decap 用这个地址读文件内容，就会拿到空内容，');
+          log('     进而报 Unrecognized front-matter format、编辑器全空。');
+          return null;
+        });
+    }).catch(function (e) {
+      log('❌ 请求失败：' + e.message);
+      if (/401/.test(e.message)) log('   → 令牌失效，请重新登录后台');
+    });
+  }
+})();
+</script>
+</body>
+</html>

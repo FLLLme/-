@@ -44,36 +44,40 @@
     renderStats();
     renderTagFilter();
     render();
+    /* 不 await：作品集/朋友章与文章列表互不依赖，异步加载避免拖慢首屏 */
     renderExtras();
   });
 
   /* ---------------- 作品集 / 朋友章 ----------------
-     两块都由 config.js 驱动：数据为空时整个 section 保持 hidden，
-     既不渲染空标题，也不会留下指向空区块的死链。
-     以后往 config.js 的 works / friends 里加条目即自动出现。 */
-  function renderExtras() {
-    renderWorks();
-    renderFriends();
+     数据来自 CMS 后台（content/works、content/friends），
+     经 tools/sync_extras.py 汇总为 posts/works.json、posts/friends.json。
+
+     作品集为空时保留设计稿里那片图片区域的位置，用等量空灰块占位；
+     朋友章为空时整块隐藏。判断依据是**加载后的真实数据**，
+     所以必须等 Store.loadExtras() 回来再决定，而不是在 HTML 里预先写死。 */
+  async function renderExtras() {
+    const { works, friends } = await window.Store.loadExtras();
+    renderWorks(works);
+    renderFriends(friends);
   }
 
-  function renderWorks() {
-    const list = Array.isArray(CFG.works) ? CFG.works : [];
+  function renderWorks(list) {
     const section = $('#worksSection');
     const grid = $('#worksGrid');
     if (!section || !grid) return;
 
-    /* 有作品就渲染作品；没有作品时保留设计稿里那片图片区域的位置，
-       用等量的空灰块占位（不编造标题）。数量由 config.workPlaceholders 决定，
-       设为 0 则整块隐藏。 */
     const placeholders = Math.max(0, Number(CFG.workPlaceholders) || 0);
-
     if (!list.length && !placeholders) return;
 
     const nodes = list.length
       ? list.map(w => {
           const cell = document.createElement(w.href ? 'a' : 'div');
           cell.className = 'work';
-          if (w.href) { cell.href = w.href; cell.target = '_blank'; cell.rel = 'noopener'; }
+          if (w.href) {
+            cell.href = w.href;
+            cell.target = '_blank';
+            cell.rel = 'noopener';
+          }
 
           const thumb = document.createElement('div');
           thumb.className = 'work-thumb';
@@ -90,6 +94,14 @@
           name.textContent = w.title || '';
 
           cell.append(thumb, name);
+
+          // 简介是可选字段，只有填了才出现
+          if (w.summary) {
+            const desc = document.createElement('span');
+            desc.className = 'work-summary';
+            desc.textContent = w.summary;
+            cell.insertBefore(desc, name);
+          }
           return cell;
         })
       : Array.from({ length: placeholders }, () => {
@@ -106,8 +118,7 @@
     section.hidden = false;
   }
 
-  function renderFriends() {
-    const list = Array.isArray(CFG.friends) ? CFG.friends : [];
+  function renderFriends(list) {
     const section = $('#friendsSection');
     const grid = $('#friendsGrid');
     if (!section || !grid || !list.length) return;
@@ -129,10 +140,10 @@
       const body = document.createElement('div');
       body.className = 'friend-body';
 
-      const name = document.createElement(f.href ? 'a' : 'span');
+      const name = document.createElement(f.url ? 'a' : 'span');
       name.className = 'friend-name';
-      name.textContent = f.name || '';
-      if (f.href) { name.href = f.href; name.target = '_blank'; name.rel = 'noopener'; }
+      name.textContent = f.name || f.title || '';
+      if (f.url) { name.href = f.url; name.target = '_blank'; name.rel = 'noopener'; }
 
       const desc = document.createElement('span');
       desc.className = 'friend-desc';

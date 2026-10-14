@@ -1,8 +1,11 @@
 /* ==========================================================================
-   store.js — 数据层：加载并解析 Markdown 文章
-   两条加载路径：
+   store.js — 数据层：加载并解析 Markdown 文章 + 作品集/朋友章
+   文章的两条加载路径：
      1) HTTP 模式：fetch posts/manifest.json → 逐个 fetch posts/*.md（真实来源）
      2) 离线模式：fetch 失败时回退到 window.POST_BUNDLE（由 tools/bundle.py 生成）
+
+   作品集与朋友章只有一条路径：fetch posts/works.json、posts/friends.json
+   （由 tools/sync_extras.py 从 content/ 下的后台数据汇总而来）。
    ========================================================================== */
 (function () {
   'use strict';
@@ -15,6 +18,10 @@
     error: null,
     missing: [],         // manifest 中登记但读取失败的文件
     _promise: null,
+
+    /* 作品集 / 朋友章：内容简单（无正文），用一个共享的加载器即可 */
+    works: [],
+    friends: [],
 
     /** 加载全部文章（带缓存，重复调用返回同一 Promise） */
     load(force) {
@@ -122,10 +129,40 @@
           || p.tags.some(t => t.toLowerCase().includes(kw))
           || p.plainText.toLowerCase().includes(kw);
       });
+    },
+
+    /* ---------------- 作品集 / 朋友章 ---------------- */
+
+    /** 加载作品集与朋友章，两份数据互不依赖，任意一份失败都不影响另一份 */
+    async loadExtras() {
+      const [works, friends] = await Promise.all([
+        loadExtra(CFG.worksFile, '作品集'),
+        loadExtra(CFG.friendsFile, '朋友章')
+      ]);
+      this.works = works;
+      this.friends = friends;
+      return { works, friends };
     }
   };
 
   /* ---------------- 内部工具 ---------------- */
+
+  /**
+   * 读取一份由后台汇总出来的 JSON 列表。
+   *
+   * 与文章不同，这里**不抛错、不回退**：文件缺失就是"还没上传作品"这一种正常状态，
+   * 返回空数组让页面退回占位块即可。若跟着抛错，会把首页整个带崩。
+   */
+  async function loadExtra(url, label) {
+    try {
+      const data = JSON.parse(await fetchText(url));
+      if (!Array.isArray(data)) throw new Error('顶层不是数组');
+      return data.filter(item => item && typeof item === 'object');
+    } catch (err) {
+      console.warn(`[store] ${label} 加载失败（${url}）：${err.message}，按空处理。`);
+      return [];
+    }
+  }
 
   async function fetchText(url) {
     const res = await fetch(url, { cache: 'no-store' });

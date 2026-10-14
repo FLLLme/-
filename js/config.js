@@ -15,18 +15,24 @@ window.BLOG_CONFIG = {
   postsDir: 'posts/',           // Markdown 文件目录（相对于站点根路径）
   manifest: 'posts/manifest.json',
 
-  /* ---------- 作品集 ----------
-     留空数组时，首页「作品集」会保留设计稿里那片图片区域的位置，
-     用 workPlaceholders 个等量空灰块占位（不编造标题）。
-     填入内容后自动改为渲染真实作品，数量由数组长度决定。
-     格式：{ title: '作品名', image: '图片地址（可选）', href: '点进去的链接（可选）' }  */
-  works: [],
-  workPlaceholders: 3,          // 作品为空时显示的占位图块数；设为 0 则整块隐藏
+  /* ---------- 作品集 / 朋友章 ----------
+     这两块的数据来自 CMS 后台，**不在这里配置**：
+     后台「作品集」「朋友章」两个栏目
+        → content/works/*.json、content/friends/*.json
+        → tools/sync_extras.py 汇总为下面两个文件
+        → 前端读取
 
-  /* ---------- 朋友章（友链）----------
-     同样留空即整块隐藏。格式：
-       { name: '站点名', desc: '一句话介绍', href: '链接', avatar: '头像地址（可选）' }  */
-  friends: [],
+     所以日常增删改作品、友链，请到 https://www.flllme.xyz/admin/ 里操作。 */
+
+  worksFile: 'posts/works.json',      // 由 tools/sync_extras.py 生成，勿手改
+  friendsFile: 'posts/friends.json',  // 由 tools/sync_extras.py 生成，勿手改
+
+  /* 作品集为空时，首页保留设计稿里那片图片区域的位置，
+     用 workPlaceholders 个等量空灰块占位（不编造标题）。
+     设为 0 则整块隐藏。一旦后台里有了真实作品，占位块自动让位。 */
+  workPlaceholders: 3,
+
+  /* 朋友章没有任何条目时整块隐藏（不做占位）。 */
 
   /* ---------- Twikoo 评论系统 ----------
      1) 前往 https://twikoo.js.org/ 部署后端（腾讯云 / Vercel / Docker 均可）

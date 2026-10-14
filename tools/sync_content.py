@@ -93,6 +93,9 @@ def main() -> int:
         MANIFEST.write_text(
             json.dumps({"posts": sorted(names)}, ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
+            # 必须显式指定：Windows 上默认会把 \n 写成 \r\n，而 CI 跑在 Linux 上是 \n，
+            # 两边哈希对不上会导致每次提交都产生无意义的差异。
+            newline="\n",
         )
 
     prefix = "[sync][dry-run] " if args.dry_run else "[sync] "

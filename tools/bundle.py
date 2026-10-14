@@ -57,6 +57,9 @@ def main() -> int:
         "   数据来源：posts/*.md（Markdown 是唯一事实来源）。*/\n"
         f"window.POST_BUNDLE = {payload};\n",
         encoding="utf-8",
+        # 显式指定换行符，否则 Windows 会写出 CRLF 而 Linux CI 写出 LF，
+        # 两边哈希不一致，每次提交都会产生无意义的差异。
+        newline="\n",
     )
 
     size_kb = OUTPUT.stat().st_size / 1024

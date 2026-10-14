@@ -35,14 +35,18 @@ http://127.0.0.1:8080
 ├─ start.bat               Windows 一键启动
 │
 ├─ .github/workflows/
-│   └─ sync-content.yml    ★ 把 content/posts/ 同步为 posts/ 并重建清单
+│   └─ sync-content.yml    ★ 把 content/ 同步为 posts/ 并重建清单
 │
-├─ content/posts/          ★ 文章的唯一事实来源（由 CMS 后台读写）
-│   └─ *.md
+├─ content/                ★ 内容的唯一事实来源（由 CMS 后台读写）
+│   ├─ posts/*.md          文章
+│   ├─ works/*.json        作品集，每个作品一个文件
+│   └─ friends/*.json      朋友章（友链），每个友链一个文件
 │
 ├─ posts/                  前端消费的生成目录（由工作流自动维护，勿手改）
 │   ├─ *.md                从 content/posts/ 同步而来
 │   ├─ manifest.json       文章清单，供前端枚举
+│   ├─ works.json          作品集汇总
+│   ├─ friends.json        朋友章汇总
 │   └─ bundle.js           离线数据包（file:// 兜底）
 │
 ├─ static/
@@ -68,6 +72,7 @@ http://127.0.0.1:8080
 │
 └─ tools/
     ├─ sync_content.py     content/posts → posts 同步 + 重建 manifest
+    ├─ sync_extras.py      content/works、content/friends → posts/*.json 汇总
     ├─ bundle.py           从 posts/*.md 生成离线数据包
     └─ selftest.js         校验 Markdown 解析结果的命令行自检
 ```
@@ -78,17 +83,19 @@ http://127.0.0.1:8080
 你在后台写作                     GitHub Actions                  读者看到的
 ─────────────                  ────────────────                ──────────
 Decap CMS  ──写入──▶  content/posts/*.md
+                  ──▶  content/works/*.json
+                  ──▶  content/friends/*.json
                             │
                             │  推送触发 sync-content.yml
                             ▼
-                      posts/*.md + manifest.json + bundle.js
+       posts/*.md + manifest.json + works.json + friends.json + bundle.js
                             │
                             │  提交回 main
                             ▼
                                                     ──▶  GitHub Pages 提供静态文件
 ```
 
-**关键理解**：`content/posts/` 是源，`posts/` 是产物。
+**关键理解**：`content/` 是源，`posts/` 是产物。
 你只应该编辑前者——后者会在每次推送时被工作流覆盖。
 
 ---
@@ -172,6 +179,75 @@ tags:                    # 块状列表（后台保存时用这种）
 ```bash
 python tools/bundle.py
 ```
+
+---
+
+## 三·五、添加作品与友链
+
+作品集与朋友章同样在后台维护，**不用改任何代码**。
+
+打开 `https://www.flllme.xyz/admin/` 登录后，左侧会多出两个栏目：
+
+### 「作品集」栏目
+
+每个作品存成 `content/works/xxx.json` 一个文件，字段如下：
+
+| 字段 | 必填 | 说明 |
+| --- | --- | --- |
+| 作品名称 | 是 | 显示在封面图下方 |
+| 封面图 | 否 | 后台上传。建议 16:10（如 1600×1000） |
+| 作品链接 | 否 | 填了整张卡片可点击并新标签打开 |
+| 一句话简介 | 否 | 显示在作品名称上方 |
+| 创作日期 | 否 | 用于排序，新作品在前 |
+| 排序权重 | 否 | 数字越小越靠前，留空按日期倒序 |
+
+**排序规则**：`order` 升序 → `date` 降序 → 名称升序。三级都是稳定排序，
+后台怎么增删改，生成结果始终一致。
+
+### 「朋友章」栏目
+
+每个友链存成 `content/friends/xxx.json`，字段如下：
+
+| 字段 | 必填 | 说明 |
+| --- | --- | --- |
+| 网名 | 是 | 显示在列表里，也是后台的条目标识 |
+| 头像 | 否 | 正方形效果最好，留空显示灰色圆形占位 |
+| 站点地址 | 否 | 填了点击网名即跳转 |
+| 网站简介 | 否 | 显示在网名下方 |
+| 排序权重 | 否 | 数字越小越靠前，留空按网名排序 |
+
+### 空状态的行为
+
+- **作品集为空**：首页保留设计稿里那片图片区域的位置，用 3 个空灰块占位
+  （数量由 `js/config.js` 的 `workPlaceholders` 控制）。一旦有了真实作品，占位块自动让位。
+- **朋友章为空**：整块隐藏，不留空标题。
+
+这两个判断依据是**加载后的真实数据**，所以 `posts/works.json` 还没生成时
+（首次部署、或工作流没跑成功）页面也只是回到占位状态，不会报错。
+
+### 保存后如何生效
+
+保存 → Decap 提交到 `main` → 工作流运行 `tools/sync_extras.py` →
+生成 `posts/works.json` → 约 1 分钟后线上生效。
+
+本地想立即看效果：
+
+```bash
+python tools/sync_extras.py
+```
+
+### 容错
+
+`tools/sync_extras.py` 的规则与 `sync_content.py` **刻意不同**：
+
+| 情况 | 行为 | 原因 |
+| --- | --- | --- |
+| 源目录不存在 / 没有 JSON | 写入 `[]` | "还没上传作品"是正常状态 |
+| 个别文件解析失败 | 跳过该文件并打印文件名 | 其余作品照常发布 |
+| 有文件但**全部**解析失败 | 中止，不写盘，退出码 1 | 绝不能让线上作品被清空 |
+
+文章那边为空是**故障**（会静默清空站点），所以 `sync_content.py` 有安全阀中止；
+这边为空是**合法状态**，规则正好相反。
 
 ---
 
@@ -391,27 +467,31 @@ Twikoo 的后端可以独立部署（Vercel / 腾讯云函数 / Docker），与�
 
 ### 为什么需要这条流水线
 
-纯静态博客没有后端，浏览器无法枚举服务器上的目录，因此前端必须靠一份
-`posts/manifest.json` 清单才知道"有哪些文章"。
+纯静态博客没有后端，浏览器无法枚举服务器上的目录，因此前端必须靠一份清单
+（文章的 `posts/manifest.json`、作品与友链的 `posts/works.json`、`posts/friends.json`）
+才知道"有哪些内容"。
 
-而 Decap CMS 只能写内容文件，**不会维护这份清单**。于是新增的文章虽然进了仓库，
-却不会出现在列表页——这是最容易踩的坑。`sync-content.yml` 就是用来补上这一环的。
+而 Decap CMS 只能写内容文件，**不会维护这些清单**。于是新增的内容虽然进了仓库，
+却不会出现在页面上——这是最容易踩的坑。`sync-content.yml` 就是用来补上这一环的。
 
 ### 工作流做了什么
 
-`.github/workflows/sync-content.yml`，触发条件是**向 main 推送且 `content/posts/` 有改动**：
+`.github/workflows/sync-content.yml`，触发条件是**向 main 推送且 `content/` 下
+`posts/`、`works/`、`friends/` 任一目录有改动**：
 
 1. 检出仓库
 2. 运行 `tools/sync_content.py` —— 把 `content/posts/*.md` 同步到 `posts/`，
    删除源中已不存在的文章，并按实际内容重建 `posts/manifest.json`
-3. 运行 `tools/bundle.py` —— 重建离线数据包 `posts/bundle.js`
-4. 若 `posts/` 有变化则提交并推送回 `main`（提交信息带 `[skip ci]`）
+3. 运行 `tools/sync_extras.py` —— 把 `content/works/*.json`、`content/friends/*.json`
+   分别汇总为 `posts/works.json`、`posts/friends.json`
+4. 运行 `tools/bundle.py` —— 重建离线数据包 `posts/bundle.js`
+5. 若 `posts/` 有变化则提交并推送回 `main`（提交信息带 `[skip ci]`）
 
 ### 为什么不会无限循环
 
 三重保险，任意一条生效都不会成环：
 
-1. `paths` 过滤器只匹配 `content/posts/**`，而工作流只改动 `posts/**`，不会再次触发自身
+1. `paths` 过滤器只匹配 `content/**`，而工作流只改动 `posts/**`，不会再次触发自身
 2. 提交信息含 `[skip ci]`
 3. GitHub 规定：用 `GITHUB_TOKEN` 推送的提交**不会**触发新的工作流运行
 
@@ -427,6 +507,7 @@ Twikoo 的后端可以独立部署（Vercel / 腾讯云函数 / Docker），与�
 ```bash
 python tools/sync_content.py --dry-run   # 只看将要发生的改动
 python tools/sync_content.py             # 实际执行
+python tools/sync_extras.py              # 汇总作品集与朋友章
 python tools/bundle.py                   # 重建离线包
 ```
 
@@ -435,18 +516,24 @@ python tools/bundle.py                   # 重建离线包
 `sync_content.py` 在 `content/posts/` 为空时会**中止并报错**，绝不清空 `posts/`。
 这是为了防止"源目录被误删/改错路径"导致线上文章全被清掉。
 
-筛选规则：以下划线或点开头的文件（如 `_draft.md`）视为草稿，不参与发布。
+`sync_extras.py` 的规则相反：作品/友链为空是**合法状态**（还没上传），写入 `[]` 即可；
+只有"有文件但全部解析失败"才中止——那时多半是脚本或批量改动出了问题，
+宁可不发布也不能把线上作品清空。
+
+筛选规则：以下划线或点开头的文件（如 `_draft.md`、`_draft.json`）视为草稿，不参与发布。
 
 ### 后台（Decap CMS）
 
 | 项目 | 值 |
 | --- | --- |
-| 入口 | `https://flllme.github.io/-/static/admin/` |
+| 入口 | `https://www.flllme.xyz/admin/` |
 | 仓库 | `FLLLme/-` |
 | 分支 | `main` |
-| 内容目录 | `content/posts/` |
-| OAuth 代理 | `https://my-blog-oauth.flllme-one.workers.dev` |
-| 字段 | 标题、日期、标签、摘要、正文 |
+| 内容目录 | `content/posts/`、`content/works/`、`content/friends/` |
+| OAuth 代理 | `https://api.flllme.xyz` |
+| 文章字段 | 标题、日期、标签、摘要、正文 |
+| 作品字段 | 名称、封面图、链接、简介、日期、排序权重 |
+| 友链字段 | 网名、头像、站点地址、简介、排序权重 |
 
 `base_url` 只写到根地址，Decap 会自行拼接 `/auth` 与 `/callback`；
 **不要手动加 `/callback`**，否则会拼成 `/callback/callback`。
@@ -461,8 +548,10 @@ python tools/bundle.py                   # 重建离线包
 | 决策 | 理由 |
 | --- | --- |
 | 零框架 | 博客交互密度低，原生 DOM 足够；首屏无 hydration 成本，包体积约 40 KB（不含 CDN 库） |
-| Markdown 双目录 | `content/posts/` 给 CMS 写，`posts/` 给前端读，用一次 CI 同步换取"后台可视化写作" |
+| Markdown 双目录 | `content/` 给 CMS 写，`posts/` 给前端读，用一次 CI 同步换取"后台可视化写作" |
 | 无运行时枚举 | 静态托管无法列目录，故用清单文件；清单由 CI 自动重建，人不碰 |
+| 作品/友链用 JSON | 内容全是结构化字段，没有正文；JSON 可被浏览器直接解析，不必塞进 front matter |
+| 汇总成单文件 | 浏览器不能列目录，与其维护第二份清单，不如由 CI 汇总成一个 JSON |
 | 双路径加载 | HTTP 走真实 `.md`，`file://` 走打包数据，两全其美 |
 | 内置解析器兜底 | CDN 不可达时页面仍能渲染，不依赖单一外部服务 |
 | 同源代理调 AI | 同时解决 CORS 与密钥安全，不牺牲流式体验 |

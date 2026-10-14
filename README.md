@@ -28,9 +28,11 @@ http://127.0.0.1:8080
 
 ```
 .
+├─ .nojekyll               ★ GitHub Pages 必需，关闭 Jekyll（详见第九节）
 ├─ index.html              文章列表页
 ├─ post.html               文章详情页（?id=<slug>）
 ├─ server.py               本地服务器 + DeepSeek 同源代理
+├─ start.bat               Windows 一键启动
 │
 ├─ css/
 │   └─ style.css           全站样式（设计令牌 + 明暗主题 + 响应式）
@@ -48,6 +50,9 @@ http://127.0.0.1:8080
 │   ├─ manifest.json       文章清单（新增文章需在此登记）
 │   ├─ *.md                Markdown 源文件 ← 唯一事实来源
 │   └─ bundle.js           离线数据包（由 tools/bundle.py 生成，勿手改）
+│
+├─ deploy/
+│   └─ cloudflare-worker.js  可选：线上共享代理，让访客无需自备 API Key
 │
 └─ tools/
     ├─ bundle.py           从 posts/*.md 生成离线数据包
@@ -128,8 +133,19 @@ AI 助手位于文章详情页右下角。它有两种工作模式，页面加�
 
 | 模式 | 触发条件 | 密钥位置 | 适用场景 |
 | --- | --- | --- | --- |
-| **代理模式**（推荐） | `/api/health` 可访问 | 服务端环境变量 | 生产部署 |
-| 直连模式 | 探测失败时回落 | 浏览器 localStorage | 本地实验 |
+| **代理模式**（推荐） | 健康检查地址可访问 | 服务端环境变量 | 生产部署 |
+| 直连模式 | 探测失败时回落 | 浏览器 localStorage | 本地实验、GitHub Pages |
+
+健康检查地址由 `proxyEndpoint` 自动推导（`…/api/chat` → `…/api/health`），
+因此切换代理只需改一个字段：
+
+```js
+// 本地开发（server.py）
+proxyEndpoint: '/api/chat'
+
+// 线上部署（Cloudflare Worker 等外部代理）
+proxyEndpoint: 'https://your-worker.workers.dev/api/chat'
+```
 
 **为什么不直接用浏览器直连？** 两个原因：
 
@@ -233,7 +249,70 @@ Key 无效或未配置。环境变量方式请确认变量名是 `DEEPSEEK_API_K
 
 ---
 
-## 九、技术要点
+## 九、部署到 GitHub Pages
+
+### 必须先加 `.nojekyll`
+
+这是本项目的**必要步骤**，不是可选优化。
+
+GitHub Pages 默认用 Jekyll 处理站点。而本项目的文章文件以 `---` 包裹的 front matter 开头，
+Jekyll 会把它识别成**自己的**页面元数据，于是把 `posts/*.md` 编译成 `posts/*.html`，
+原始 `.md` 文件不再被发布。结果是前端的主加载路径全部 404，只能退到离线数据包。
+
+对照现象（部署 `.nojekyll` 前后）：
+
+| 路径 | 无 `.nojekyll` | 有 `.nojekyll` |
+| --- | --- | --- |
+| `posts/hello-blog.md` | **404** | 200 |
+| `posts/hello-blog.html` | 200（Jekyll 生成的冗余页面） | 404 |
+| `README.md` | 200（无 front matter，被原样保留） | 200 |
+
+**做法**：在仓库根目录放一个名为 `.nojekyll` 的**空文件**（本项目根目录已包含）。
+它会让 Pages 跳过 Jekyll，所有文件按原样发布。
+
+> 若通过 GitHub Actions 发布（`upload-pages-artifact`），`.nojekyll` 需位于上传的产物根目录。
+> 若通过「Settings → Pages → Deploy from a branch」发布，放在分支根目录即可。
+
+### 完整的部署步骤
+
+```bash
+git add .nojekyll
+git commit -m "chore: 关闭 Jekyll，使 Markdown 源文件可被直接访问"
+git push
+```
+
+推送后等待 Pages 重新构建（约 1 分钟），然后验证：
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" https://<用户名>.github.io/<仓库名>/posts/hello-blog.md
+# 期望输出 200；若仍为 404，说明 .nojekyll 未生效
+```
+
+### 关于 AI 助手
+
+GitHub Pages 只能托管静态文件，**无法运行 `server.py`**，因此线上站点会自动回落到直连模式。
+经实测，`api.deepseek.com` 的 CORS 策略是按 Origin 回显的：
+
+```
+access-control-allow-origin: https://<用户名>.github.io
+access-control-allow-methods: POST
+access-control-allow-headers: authorization,content-type
+```
+
+所以直连模式在线上可以正常工作，但每位访客都需要在设置面板填入自己的 API Key
+（Key 只存在访客本机浏览器，不会上传）。
+
+**如果你希望访客开箱即用**，部署 `deploy/cloudflare-worker.js` 作为共享代理：
+密钥由 Worker 环境变量持有，访客无需任何配置。该方案在 Cloudflare 免费额度内即可运行。
+
+### 关于评论
+
+Twikoo 的后端可以独立部署（Vercel / 腾讯云函数 / Docker），与博客托管位置无关。
+部署完成后把地址填入 `js/config.js` 的 `twikoo.envId` 即可，GitHub Pages 不受影响。
+
+---
+
+## 十、技术要点
 
 | 决策 | 理由 |
 | --- | --- |

@@ -1,7 +1,7 @@
 # ============================================================================
 # Decap CMS 配置（原 Netlify CMS）
 #
-# 后台入口：https://flllme.github.io/-/admin/
+# 后台入口：https://www.flllme.xyz/admin/
 # 本文件需与 index.html、decap-cms.js 放在同一目录，
 # Decap 默认读取与页面同级的 config.yml。
 #
@@ -38,8 +38,8 @@ backend:
 # ---------------------------------------------------------------------------
 # 站点信息（用于生成"查看线上页面"的预览链接）
 # ---------------------------------------------------------------------------
-site_url: 'https://flllme.github.io/-/'
-display_url: 'https://flllme.github.io/-/'
+site_url: 'https://www.flllme.xyz/'
+display_url: 'https://www.flllme.xyz/'
 logo_url: ''
 
 # ---------------------------------------------------------------------------

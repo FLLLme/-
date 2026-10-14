@@ -1,17 +1,18 @@
 # ============================================================================
-# 同步 content/posts → posts/
+# 同步 content/ → posts/
 #
 # 用途
-#   本博客是纯静态站点，前端通过 posts/manifest.json 获知"有哪些文章"。
-#   而 Decap CMS 后台只会写内容文件（content/posts/*.md），无法维护这份清单。
-#   这个工作流负责在推送时补齐缺口：
-#     content/posts/  --(本工作流)-->  posts/*.md + posts/manifest.json
+#   本博客是纯静态站点，前端需要一份"有哪些内容"的清单。
+#   而 Decap CMS 后台只会写内容文件，无法维护这份清单。这个工作流负责补齐：
+#     content/posts/*.md     --(本工作流)-->  posts/*.md + posts/manifest.json
+#     content/works/*.json   --(本工作流)-->  posts/works.json
+#     content/friends/*.json --(本工作流)-->  posts/friends.json
 #
 # 触发条件
-#   向 main 推送且 content/posts/ 内有改动；也支持在 Actions 页面手动触发。
+#   向 main 推送且上述任一内容目录有改动；也支持在 Actions 页面手动触发。
 #
 # 为什么不会无限循环
-#   1) paths 只匹配 content/posts/**，而本工作流只改动 posts/**，不会再次触发自身；
+#   1) paths 只匹配 content/**，而本工作流只改动 posts/**，不会再次触发自身；
 #   2) 提交信息带 [skip ci]；
 #   3) GitHub 规定用 GITHUB_TOKEN 推送的提交不会触发新的工作流运行。
 #   三重保险，任意一条生效都不会成环。
@@ -28,6 +29,8 @@ on:
     branches: [main]
     paths:
       - 'content/posts/**'
+      - 'content/works/**'
+      - 'content/friends/**'
   workflow_dispatch:        # 允许在 Actions 页面手动运行
 
 permissions:
@@ -54,6 +57,9 @@ jobs:
 
       - name: 同步文章并重建 manifest.json
         run: python tools/sync_content.py
+
+      - name: 汇总作品集与朋友章
+        run: python tools/sync_extras.py
 
       - name: 重建离线数据包 bundle.js
         run: python tools/bundle.py

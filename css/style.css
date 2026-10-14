@@ -516,6 +516,14 @@ main { display: block; }
   transition: color .2s;
 }
 .work:hover .work-title { color: var(--accent); }
+/* 简介是可选字段，只有后台填了才渲染 */
+.work-summary {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-mute);
+}
 
 /* 作品为空时的占位图块：只保留设计稿里那片图片区域的位置，不放任何文字 */
 .work-placeholder { pointer-events: none; }

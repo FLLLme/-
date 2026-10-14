@@ -182,7 +182,76 @@
   if (location.protocol === 'file:') {
     showFileProtocolError();
   } else {
+    installOAuthShim();
     loadCMS(0);
+  }
+
+  /* ==========================================================================
+     OAuth 兼容层
+
+     背景
+     ----
+     当前使用的 OAuth Worker 在 /callback 中把「裸 JSON」直接发给主窗口：
+
+         {"token":"gho_xxxxxxxx"}
+
+     而 Decap 期望的是标准格式，并且要求先完成一次握手：
+
+         ① 回调页 → 主窗口：  authorizing:github
+         ② 主窗口校验来源后 → 回调页：  authorizing:github     ← 回执
+         ③ 回调页收到回执后 → 主窗口：  authorization:github:success:{"token":"...","provider":"github"}
+
+     Decap 内部是这么匹配的：
+
+         if (event.origin === base_url) {
+           if (event.data.indexOf('authorization:github:success:') === 0) { 登录成功 }
+         }
+
+     裸 JSON 匹配不上，消息会被**静默丢弃**：既不登录，也不报任何错。
+     而 ① 没发出，Decap 连结果监听器都不会注册。
+
+     本层做的事
+     ----------
+     拦截 worker 发来的裸 token JSON，把缺失的握手和前缀补齐后，
+     以相同的 origin 重新派发一条标准 message 事件交给 Decap。
+
+     兼容性
+     ------
+     如果将来把 worker 修好了（发出的是标准格式），本层会原样放行，不做任何干预。
+     修好后可以直接删掉这个函数。
+     ========================================================================== */
+  function installOAuthShim() {
+    var PROXY_ORIGIN = 'https://api.flllme.xyz';
+
+    function emit(data, origin) {
+      window.dispatchEvent(new MessageEvent('message', { data: data, origin: origin }));
+    }
+
+    window.addEventListener('message', function (event) {
+      if (typeof event.data !== 'string') return;
+      if (event.origin !== PROXY_ORIGIN) return;
+
+      var raw = event.data.trim();
+
+      // 已经是标准协议格式 → 放行，不干预
+      if (raw.indexOf('authorization:') === 0 || raw.indexOf('authorizing:') === 0) return;
+
+      var payload;
+      try { payload = JSON.parse(raw); } catch (err) { return; }
+      if (!payload || !payload.token) return;
+
+      // 补上 provider 字段，与官方 OAuth provider 的输出保持一致
+      if (!payload.provider) payload.provider = 'github';
+
+      // 第一步：补发握手，让 Decap 注册结果监听器
+      emit('authorizing:github', event.origin);
+      // 第二步：转发标准格式的结果
+      emit('authorization:github:success:' + JSON.stringify(payload), event.origin);
+
+      if (window.console) {
+        console.info('[oauth-shim] 已将 worker 的裸 token 转换为标准格式并补发握手');
+      }
+    }, true);   // 捕获阶段，确保先于 Decap 的监听器执行
   }
 </script>
 

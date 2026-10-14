@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>OAuth 握手诊断</title>
+<style>
+  :root {
+    --ok: #16a34a; --bad: #dc2626; --warn: #d97706; --muted: #6b7280;
+    --border: #e4e7ee; --bg: #f6f7f9; --card: #fff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 26px;
+    font: 14.5px/1.75 -apple-system, BlinkMacSystemFont, "Segoe UI",
+          "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: #171a21; background: var(--bg);
+  }
+  h1 { margin: 0 0 6px; font-size: 19px; }
+  .sub { margin: 0 0 20px; color: var(--muted); font-size: 13px; }
+  .card {
+    max-width: 900px; margin: 0 0 16px; padding: 18px 20px;
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+  }
+  .card h2 { margin: 0 0 12px; font-size: 15px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { padding: 6px 10px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+  th { width: 190px; color: var(--muted); font-weight: 600; }
+  code {
+    padding: 1px 5px; border: 1px solid var(--border); border-radius: 4px;
+    background: #f2f4f7; font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: .9em; word-break: break-all;
+  }
+  button {
+    padding: 9px 18px; margin-right: 8px; border: 0; border-radius: 9px;
+    background: #3d5af1; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  button:hover { background: #5b78f6; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button.ghost { background: #fff; color: #4b5563; border: 1px solid var(--border); }
+  #log {
+    max-height: 380px; overflow: auto; margin: 0; padding: 12px 14px;
+    background: #12151a; color: #e6edf3; border-radius: 9px;
+    font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 12.5px; line-height: 1.7; white-space: pre-wrap; word-break: break-all;
+  }
+  .ok { color: var(--ok); font-weight: 600; }
+  .bad { color: var(--bad); font-weight: 600; }
+  .warn { color: var(--warn); font-weight: 600; }
+  .verdict { margin-top: 14px; padding: 13px 16px; border-radius: 9px; border-left: 3px solid var(--muted); background: #f2f4f7; }
+  .verdict.ok  { border-left-color: var(--ok);  background: #f0fdf4; }
+  .verdict.bad { border-left-color: var(--bad); background: #fef2f2; }
+  .verdict.warn{ border-left-color: var(--warn); background: #fffbeb; }
+  ol { margin: 6px 0 0; padding-left: 22px; }
+  li { margin: 4px 0; }
+</style>
+</head>
+<body>
+
+<h1>OAuth 握手诊断</h1>
+<p class="sub">用于定位「点登录没反应」究竟断在哪一环。请把本页的完整结果截图。</p>
+
+<div class="card">
+  <h2>① 环境检查</h2>
+  <table>
+    <tr><th>页面来源 (origin)</th><td><code id="origin">…</code></td></tr>
+    <tr><th>协议</th><td><span id="proto">…</span></td></tr>
+    <tr><th>config.yml 的 base_url</th><td><code id="baseUrl">读取中…</code></td></tr>
+    <tr><th>两者是否匹配</th><td><span id="match">…</span></td></tr>
+    <tr><th>即将请求的授权地址</th><td><code id="authUrl">…</code></td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h2>② 发起授权并记录握手</h2>
+  <button id="start">开始授权测试</button>
+  <button id="clear" class="ghost">清空日志</button>
+  <p class="sub" style="margin:12px 0 8px">
+    点击后会弹出 GitHub 授权窗口。请在弹窗中完成授权，然后观察下方日志。
+  </p>
+  <pre id="log">（等待开始…）</pre>
+  <div id="verdict" class="verdict">尚未开始。</div>
+</div>
+
+<div class="card">
+  <h2>③ 日志怎么看</h2>
+  <ol>
+    <li><b>完全没有 MSG 行</b> → 弹窗从未向本页回传消息。多半是弹窗被拦，或 worker 回调页没有实现回传。</li>
+    <li><b>有 MSG 但 origin 不是 base_url</b> → 来源不匹配，Decap 会丢弃该消息，握手静默失败。</li>
+    <li><b>只有 <code>authorizing:github</code>，之后再无动静</b> → 本页的回执没送达弹窗（弹窗引用失效）。</li>
+    <li><b>出现 <code>authorization:github:error:…</code></b> → token 交换失败，错误详情就在消息里。</li>
+    <li><b>出现 <code>authorization:github:success:…</code></b> → 握手成功，问题在别处。</li>
+  </ol>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var elOrigin  = document.getElementById('origin');
+  var elProto   = document.getElementById('proto');
+  var elBaseUrl = document.getElementById('baseUrl');
+  var elMatch   = document.getElementById('match');
+  var elAuthUrl = document.getElementById('authUrl');
+  var elLog     = document.getElementById('log');
+  var elVerdict = document.getElementById('verdict');
+  var btnStart  = document.getElementById('start');
+
+  var baseUrl = null;
+  var authWindow = null;
+  var sawAuthorizing = false;
+  var settled = false;
+  var msgCount = 0;
+  var lastData = '';
+
+  function log(line) {
+    var t = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+    elLog.textContent = elLog.textContent === '（等待开始…）'
+      ? '[' + t + '] ' + line
+      : elLog.textContent + '\n[' + t + '] ' + line;
+    elLog.scrollTop = elLog.scrollHeight;
+  }
+
+  function verdict(cls, html) {
+    elVerdict.className = 'verdict ' + cls;
+    elVerdict.innerHTML = html;
+  }
+
+  /* ---------------- ① 环境 ---------------- */
+  elOrigin.textContent = location.origin;
+  elProto.textContent = location.protocol + (location.protocol === 'https:' ? '（安全，符合要求）' : '（非 https，Decap 会拒绝鉴权）');
+
+  /* 只提取 base_url 一行，避免为了读 YAML 引入依赖 */
+  fetch('config.yml', { cache: 'no-store' })
+    .then(function (r) {
+      if (!r.ok) throw new Error('config.yml HTTP ' + r.status);
+      return r.text();
+    })
+    .then(function (text) {
+      var m = text.match(/^\s*base_url\s*:\s*["']?([^"'\s#]+)/m);
+      if (!m) throw new Error('config.yml 中找不到 base_url');
+      baseUrl = m[1].replace(/\/+$/, '');
+
+      elBaseUrl.textContent = baseUrl;
+      var auth = baseUrl + '/auth?provider=github&site_id='
+        + location.host.split(':')[0] + '&scope=repo';
+      elAuthUrl.textContent = auth;
+
+      if (baseUrl === location.origin) {
+        elMatch.className = 'ok';
+        elMatch.textContent = '匹配 ✓';
+      } else {
+        elMatch.className = 'warn';
+        elMatch.textContent = '不相等（正常情况：本站是 flllme.github.io，代理在 api.flllme.xyz，'
+          + '但 worker 回传消息的 origin 必须是 base_url）';
+      }
+      log('环境就绪：origin=' + location.origin + '  base_url=' + baseUrl);
+    })
+    .catch(function (e) {
+      elBaseUrl.textContent = '读取失败：' + e.message;
+      log('❌ ' + e.message);
+      btnStart.disabled = true;
+    });
+
+  /* ---------------- ② 监听握手消息 ---------------- */
+  window.addEventListener('message', function (e) {
+    var data = typeof e.data === 'string' ? e.data : JSON.stringify(e.data);
+    msgCount++;
+    lastData = data;
+    log('MSG  origin=' + e.origin + '\n     data=' + data.slice(0, 220));
+
+    var originOk = (e.origin === baseUrl);
+    if (!originOk) {
+      log('     ⚠️ origin 与 base_url 不一致，Decap 会丢弃这条消息');
+    }
+
+    if (data === 'authorizing:github') {
+      sawAuthorizing = true;
+      if (originOk) {
+        /* 模拟 Decap 的回执，触发回调页发送最终结果 */
+        try {
+          authWindow.postMessage('authorizing:github', e.origin);
+          log('     → 已向弹窗回执 authorizing:github');
+        } catch (err) {
+          log('     ❌ 回执失败（弹窗引用可能已失效）：' + err.message);
+        }
+      }
+    }
+
+    if (data.indexOf('authorization:github:success:') === 0) {
+      settled = true;
+      var tok = '';
+      try { tok = JSON.parse(data.replace('authorization:github:success:', '')).token || ''; }
+      catch (err) { /* 忽略 */ }
+      verdict('ok', '<b>握手成功 ✅</b> 已拿到 token（前 8 位：'
+        + (tok ? tok.slice(0, 8) + '…' : '（解析失败）')
+        + '）。说明 worker 完整实现了三段式握手，问题不在这里。');
+      log('✅ 握手成功，token 前缀 ' + (tok ? tok.slice(0, 8) : '?'));
+    }
+
+    if (data.indexOf('authorization:github:error:') === 0) {
+      settled = true;
+      verdict('bad', '<b>worker 返回了错误 ❌</b> 详情：<br><code>'
+        + data.replace('authorization:github:error:', '').slice(0, 300) + '</code>');
+    }
+  });
+
+  /* ---------------- ③ 发起授权 ---------------- */
+  btnStart.addEventListener('click', function () {
+    if (!baseUrl) { log('base_url 还没读出来，稍候'); return; }
+
+    settled = false;
+    sawAuthorizing = false;
+
+    var url = baseUrl + '/auth?provider=github&site_id='
+      + location.host.split(':')[0] + '&scope=repo';
+    log('打开弹窗：' + url);
+
+    authWindow = window.open(url, 'OAuthTest', 'width=960,height=600');
+
+    if (!authWindow) {
+      verdict('bad', '<b>弹窗被浏览器拦截 ❌</b> 请点击地址栏右侧的弹窗拦截图标，'
+        + '允许本站弹出窗口后重试。');
+      log('❌ window.open 返回 null —— 弹窗被拦截');
+      return;
+    }
+
+    log('弹窗已打开，等待握手消息…');
+    verdict('warn', '等待中…先在弹窗里完成 GitHub 授权。');
+
+    /* 超时判定：区分"消息格式不符"、"握手断在半路"、"完全没有回传" */
+    setTimeout(function () {
+      if (settled) return;
+
+      if (msgCount > 0 && !sawAuthorizing) {
+        verdict('bad',
+          '<b>收到 ' + msgCount + ' 条消息，但格式不符合 Decap 的协议 ❌</b><br>'
+          + 'worker 回传的是：<code>' + lastData.slice(0, 160).replace(/</g, '&lt;') + '</code><br>'
+          + 'Decap 要求先发 <code>authorizing:github</code>，再发 '
+          + '<code>authorization:github:success:{...}</code>。'
+          + '格式对不上时 Decap 会<b>静默丢弃</b>，既不登录也不报错。'
+          + '<br>另外 worker 也没有发出第一步的 <code>authorizing:github</code> 握手。');
+        log('⏱ 超时：收到 ' + msgCount + ' 条消息但格式不符，且缺少握手');
+      } else if (sawAuthorizing) {
+        verdict('bad', '<b>收到 authorizing 后就断了 ❌</b> '
+          + 'worker 的 /callback 页面在等待主窗口回执，但后续没有发出最终结果。'
+          + '这说明回调页的握手实现不完整（缺少第二步的 message 监听）。');
+        log('⏱ 超时：只收到 authorizing，未收到最终结果');
+      } else if (authWindow && authWindow.closed) {
+        verdict('bad', '<b>弹窗已关闭，且全程没有收到任何消息 ❌</b> '
+          + '说明 worker 的 /callback 页面没有向 window.opener 回传。'
+          + '最常见原因是回调页缺少 postMessage 逻辑，或 window.opener 被切断。');
+        log('⏱ 超时：弹窗已关闭且无任何消息');
+      } else {
+        verdict('warn', '30 秒内没有收到消息，但弹窗仍开着。'
+          + '请在弹窗里完成 GitHub 授权后再看结果。');
+        log('⏱ 超时：弹窗仍打开、无消息');
+      }
+    }, 30000);
+  });
+
+  document.getElementById('clear').addEventListener('click', function () {
+    elLog.textContent = '（已清空）';
+  });
+})();
+</script>
+</body>
+</html>

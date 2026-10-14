@@ -14,13 +14,15 @@
 
   document.addEventListener('DOMContentLoaded', async () => {
     window.App.initTheme();
-    window.App.renderHeader('home');
+    window.App.renderHeader('posts');
     window.App.renderFooter();
 
     // 静态按钮图标
     $('#copyLinkBtn').innerHTML = ICONS.copy + '<span>复制链接</span>';
     $('#askAiBtn').innerHTML = ICONS.sparkles + '<span>用 AI 提问本文</span>';
     $('#commentsTitle').innerHTML = ICONS.comment + '<span>评论</span>';
+    // 侧栏常驻的返回入口（随页面滚动固定可见）
+    $('#asideBackLink').innerHTML = ICONS.back + '<span>返回列表</span>';
 
     const slug = getQuery('id');
     const posts = await window.Store.load();

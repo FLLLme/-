@@ -5,15 +5,28 @@
 
 window.BLOG_CONFIG = {
   /* ---------- 站点信息 ---------- */
-  siteName: 'Ink & Logic',
-  siteDesc: '关于前端工程、AI 应用与写作的长期笔记',
-  author: '站长',
-  footerText: '用心记录，慢慢生长',
+  siteName: '未见花',
+  siteDesc: '于数字彼岸，记录未见的风景',
+  author: '未见花',
+  footerText: '文字 / 视觉 / 艺术',
   icp: '',                      // 如需备案号，填入后会自动展示
 
   /* ---------- 文章存储 ---------- */
   postsDir: 'posts/',           // Markdown 文件目录（相对于站点根路径）
   manifest: 'posts/manifest.json',
+
+  /* ---------- 作品集 ----------
+     留空数组时，首页「作品集」会保留设计稿里那片图片区域的位置，
+     用 workPlaceholders 个等量空灰块占位（不编造标题）。
+     填入内容后自动改为渲染真实作品，数量由数组长度决定。
+     格式：{ title: '作品名', image: '图片地址（可选）', href: '点进去的链接（可选）' }  */
+  works: [],
+  workPlaceholders: 3,          // 作品为空时显示的占位图块数；设为 0 则整块隐藏
+
+  /* ---------- 朋友章（友链）----------
+     同样留空即整块隐藏。格式：
+       { name: '站点名', desc: '一句话介绍', href: '链接', avatar: '头像地址（可选）' }  */
+  friends: [],
 
   /* ---------- Twikoo 评论系统 ----------
      1) 前往 https://twikoo.js.org/ 部署后端（腾讯云 / Vercel / Docker 均可）
@@ -54,7 +67,7 @@ window.BLOG_CONFIG = {
     temperature: 0.7,
     maxTokens: 2048,
     systemPrompt:
-      '你是一位严谨、耐心的技术博客助手。回答需准确、结构清晰，' +
+      '你是一位严谨、耐心的博客助手。回答需准确、结构清晰，' +
       '适当使用 Markdown 标题、列表与代码块。若问题超出给定文章范围，' +
       '请明确指出并给出你的补充判断。不要编造不存在的事实。',
     storageKey: 'blog.ai.settings.v1'

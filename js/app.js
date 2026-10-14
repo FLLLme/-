@@ -69,6 +69,41 @@
   }
 
   /* ---------------- 图标 ---------------- */
+
+  /* 彼岸花站标
+     参照实物照片的特征：细长的花瓣向上回卷，花蕊远长于花瓣并向外辐射，
+     每根花蕊末端带一枚花药。因此全部用「细线笔触」而非填充色块绘制，
+     小尺寸下靠「短花瓣 + 长花蕊」的强对比来辨认。
+     形状模板：
+       PETAL  —— 从花心向外，末端回卷成钩
+       STAMEN —— 从花心直达外缘的长弧线，末端配一枚椭圆花药
+     用循环按 360/N 均分角度并错开半格，避免手写大量路径。 */
+  const FLOWER_SVG = (function () {
+    const N = 5;
+    const PETAL  = 'M16 16C14.1 13.2 13.7 10.2 15.5 8.3C16.5 7.5 17.4 7.9 17.5 8.9';
+    const STAMEN = 'M16 16C14.9 11.2 14.7 6.6 16.4 2.9';
+    const step = 360 / N;
+    const parts = [];
+
+    for (let i = 0; i < N; i++) {
+      parts.push(
+        `<g transform="rotate(${step * i} 16 16)">` +
+          `<path d="${PETAL}" stroke-width="1.5"/>` +
+        '</g>',
+        `<g transform="rotate(${step * i + step / 2} 16 16)">` +
+          `<path d="${STAMEN}" stroke-width="1.05"/>` +
+          '<ellipse cx="16.5" cy="2.7" rx="0.78" ry="1.35" fill="currentColor" stroke="none"/>' +
+        '</g>'
+      );
+    }
+
+    return '<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" ' +
+             'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+             parts.join('') +
+             '<circle cx="16" cy="16" r="1.5" fill="currentColor" stroke="none"/>' +
+           '</svg>';
+  })();
+
   const ICONS = {
     sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>',
     moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>',
@@ -80,7 +115,9 @@
     send: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg>',
     close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>',
     cog: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
-    trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>'
+    trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>',
+    /* 站标：彼岸花，形状见上方 FLOWER_SVG */
+    flower: FLOWER_SVG
   };
 
   /* ---------------- 主题 ---------------- */
@@ -122,17 +159,31 @@
   function renderHeader(active) {
     const host = $('#siteHeader');
     if (!host) return;
+
+    /* 导航项按内容有无动态生成：
+       「作品集」「友链」只在 config.js 里确实有数据时才出现，
+       避免指向空区块的死链。active 传入的 key 会渲染成选中态（主色 + 下划线）。 */
+    /* 顺序与页面区块的先后保持一致（作品集在文章之前），
+       这样导航的视觉顺序与滚动高亮的判定顺序不会相互矛盾。 */
+    const items = [
+      { key: 'home',  label: '首页', href: 'index.html' },
+      (CFG.works || []).length || CFG.workPlaceholders > 0
+        ? { key: 'works',   label: '作品集', href: 'index.html#worksSection' } : null,
+      { key: 'posts', label: '文章', href: 'index.html#latest' },
+      (CFG.friends || []).length
+        ? { key: 'friends', label: '友链',   href: 'index.html#friendsSection' } : null,
+      { key: 'about', label: '关于', href: 'index.html#about' }
+    ].filter(Boolean);
+
     host.className = 'site-header';
     host.innerHTML = `
       <div class="container">
         <a class="brand" href="index.html">
-          <span class="brand-mark">${escapeHtml(CFG.siteName.slice(0, 1))}</span>
-          <span>${escapeHtml(CFG.siteName)}</span>
+          <span class="brand-mark">${ICONS.flower}</span>
+          <span class="brand-name">${escapeHtml(CFG.siteName)}</span>
         </a>
-        <nav class="nav">
-          <a href="index.html"${active === 'home' ? ' class="active"' : ''}>文章</a>
-          <a href="index.html#tags">标签</a>
-          <a href="https://github.com" target="_blank" rel="noopener">关于</a>
+        <nav class="nav" aria-label="站点导航">
+          ${items.map(it => `<a href="${it.href}"${active === it.key ? ' class="active" aria-current="page"' : ''}>${escapeHtml(it.label)}</a>`).join('')}
         </nav>
         <button class="icon-btn" id="themeToggle" type="button" aria-label="切换主题"></button>
       </div>`;
@@ -149,13 +200,14 @@
     host.className = 'site-footer';
     host.innerHTML = `
       <div class="container">
-        <div>
-          © ${year} ${escapeHtml(CFG.author)} · ${escapeHtml(CFG.footerText)}
-          ${CFG.icp ? `<br><a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">${escapeHtml(CFG.icp)}</a>` : ''}
+        <div class="footer-brand">
+          <span class="brand-mark">${ICONS.flower}</span>
+          <span>© ${year} ${escapeHtml(CFG.siteName)}</span>
         </div>
         <div class="footer-links">
-          <a href="index.html">文章列表</a>
-          <a href="index.html#tags">全部标签</a>
+          <a href="index.html">首页</a>
+          <a href="index.html#latest">文章</a>
+          <a href="index.html#about">关于</a>
           <a href="posts/manifest.json" target="_blank" rel="noopener">Markdown 源文件</a>
         </div>
       </div>`;
@@ -172,11 +224,86 @@
     container.classList.add('show');
   }
 
+  /* ---------------- 导航选中态跟随滚动 ----------------
+     首页 / 文章 / 作品集 / 关于 都是同一页内的锚点，
+     因此需要根据当前滚动位置判断该高亮哪一项（主色文字 + 下划线），
+     而不是固定挂在「首页」上。点击时也立即切换，避免等待滚动。
+     仅在首页调用；详情页的选中态由 renderHeader('posts') 固定。 */
+  function bindNavSpy() {
+    const nav = $('#siteHeader .nav');
+    if (!nav) return;
+
+    const links = $$('a', nav);
+    if (!links.length) return;
+
+    /* 把每个导航项映射到页面上的区块：
+       带 #hash 的取其元素；指向 index.html 本身（无 hash）的视为「页面顶部」 */
+    const targets = links.map(link => {
+      const href = link.getAttribute('href') || '';
+      const hash = href.indexOf('#') > -1 ? href.split('#')[1] : '';
+      const el = hash ? document.getElementById(hash) : null;
+      const isTop = !hash && /index\.html$/.test(href.split('?')[0]);
+      return { link, el, isTop };
+    }).filter(t => t.el || t.isTop);
+
+    if (!targets.length) return;
+
+    /* ⚠️ 必须按「区块在页面上的先后」排序，不能沿用导航项的顺序。
+       当前页面的实际顺序是：作品集 → 文章 → 关于，
+       而导航里写的是：首页 / 文章 / 作品集 / 关于 —— 两者不一致，
+       若按导航顺序遍历，滚动时会停在错误的区块上。 */
+    const ordered = targets
+      .filter(t => t.el)
+      .sort((a, b) =>
+        a.el.compareDocumentPosition(b.el) & 4 /* DOCUMENT_POSITION_FOLLOWING */
+          ? -1 : 1);
+
+    const setActive = target => links.forEach(a => a.classList.toggle('active', a === target.link));
+
+    const update = () => {
+      if (!ordered.length) return;
+
+      /* 以视口 30% 处作为判定线：区块顶部越过它即视为「当前所在」 */
+      const line = window.scrollY + window.innerHeight * 0.3;
+      const firstTop = ordered[0].el.getBoundingClientRect().top + window.scrollY;
+
+      if (line < firstTop) {
+        /* 还没滚到第一个区块 → 首页 */
+        const top = targets.find(t => t.isTop);
+        if (top) setActive(top);
+        return;
+      }
+
+      let current = ordered[0];
+      for (const t of ordered) {
+        if (t.el.getBoundingClientRect().top + window.scrollY <= line) current = t;
+        else break;
+      }
+      setActive(current);
+    };
+
+    links.forEach(a => a.addEventListener('click', () => {
+      const t = targets.find(x => x.link === a);
+      if (t) setActive(t);
+    }));
+
+    let ticking = false;
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => { ticking = false; update(); });
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    update();
+  }
+
   /* ---------------- 页面间共享状态 ---------------- */
   window.App = {
     $, $$, escapeHtml, escapeAttr, stripMarkdown, readingTime,
     formatDate, formatDateShort, getQuery,
     ICONS, initTheme, setTheme, toggleTheme,
-    renderHeader, renderFooter, showOfflineNotice
+    renderHeader, renderFooter, showOfflineNotice, bindNavSpy
   };
 })();

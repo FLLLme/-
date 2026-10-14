@@ -18,6 +18,8 @@
     window.App.initTheme();
     window.App.renderHeader('home');
     window.App.renderFooter();
+    /* 导航下划线跟随滚动位置（首页 / 文章 / 作品集 / 关于） */
+    window.App.bindNavSpy();
     document.title = `${CFG.siteName} · ${CFG.siteDesc}`;
 
     const searchInput = $('#searchInput');
@@ -42,7 +44,107 @@
     renderStats();
     renderTagFilter();
     render();
+    renderExtras();
   });
+
+  /* ---------------- 作品集 / 朋友章 ----------------
+     两块都由 config.js 驱动：数据为空时整个 section 保持 hidden，
+     既不渲染空标题，也不会留下指向空区块的死链。
+     以后往 config.js 的 works / friends 里加条目即自动出现。 */
+  function renderExtras() {
+    renderWorks();
+    renderFriends();
+  }
+
+  function renderWorks() {
+    const list = Array.isArray(CFG.works) ? CFG.works : [];
+    const section = $('#worksSection');
+    const grid = $('#worksGrid');
+    if (!section || !grid) return;
+
+    /* 有作品就渲染作品；没有作品时保留设计稿里那片图片区域的位置，
+       用等量的空灰块占位（不编造标题）。数量由 config.workPlaceholders 决定，
+       设为 0 则整块隐藏。 */
+    const placeholders = Math.max(0, Number(CFG.workPlaceholders) || 0);
+
+    if (!list.length && !placeholders) return;
+
+    const nodes = list.length
+      ? list.map(w => {
+          const cell = document.createElement(w.href ? 'a' : 'div');
+          cell.className = 'work';
+          if (w.href) { cell.href = w.href; cell.target = '_blank'; cell.rel = 'noopener'; }
+
+          const thumb = document.createElement('div');
+          thumb.className = 'work-thumb';
+          if (w.image) {
+            const img = document.createElement('img');
+            img.src = w.image;
+            img.alt = w.title || '';
+            img.loading = 'lazy';
+            thumb.appendChild(img);
+          }
+
+          const name = document.createElement('span');
+          name.className = 'work-title';
+          name.textContent = w.title || '';
+
+          cell.append(thumb, name);
+          return cell;
+        })
+      : Array.from({ length: placeholders }, () => {
+          const cell = document.createElement('div');
+          cell.className = 'work work-placeholder';
+          const thumb = document.createElement('div');
+          thumb.className = 'work-thumb';
+          thumb.setAttribute('aria-hidden', 'true');
+          cell.appendChild(thumb);
+          return cell;
+        });
+
+    grid.replaceChildren(...nodes);
+    section.hidden = false;
+  }
+
+  function renderFriends() {
+    const list = Array.isArray(CFG.friends) ? CFG.friends : [];
+    const section = $('#friendsSection');
+    const grid = $('#friendsGrid');
+    if (!section || !grid || !list.length) return;
+
+    grid.replaceChildren(...list.map(f => {
+      const li = document.createElement('li');
+      li.className = 'friend';
+
+      const avatar = document.createElement('span');
+      avatar.className = 'friend-avatar';
+      if (f.avatar) {
+        const img = document.createElement('img');
+        img.src = f.avatar;
+        img.alt = '';
+        img.loading = 'lazy';
+        avatar.appendChild(img);
+      }
+
+      const body = document.createElement('div');
+      body.className = 'friend-body';
+
+      const name = document.createElement(f.href ? 'a' : 'span');
+      name.className = 'friend-name';
+      name.textContent = f.name || '';
+      if (f.href) { name.href = f.href; name.target = '_blank'; name.rel = 'noopener'; }
+
+      const desc = document.createElement('span');
+      desc.className = 'friend-desc';
+      desc.textContent = f.desc || '';
+
+      body.append(name, desc);
+      li.append(avatar, body);
+      return li;
+    }));
+
+    section.hidden = false;
+  }
 
   /* ---------------- 顶部统计 ---------------- */
   function renderStats() {

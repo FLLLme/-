@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- 后台不应被搜索引擎收录 -->
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="origin">
+  <title>内容管理 · 后台</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%233d5af1'/%3E%3Ctext x='16' y='22' font-size='17' font-family='sans-serif' font-weight='bold' fill='white' text-anchor='middle'%3EC%3C/text%3E%3C/svg%3E">
+
+  <style>
+    #cms-loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      font: 15px/1.7 -apple-system, BlinkMacSystemFont, "Segoe UI",
+            "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: #4b5563;
+      background: #f6f7f9;
+    }
+    #cms-loading .box {
+      max-width: 560px;
+      padding: 28px 32px;
+      border: 1px solid #e4e7ee;
+      border-radius: 14px;
+      background: #fff;
+      box-shadow: 0 8px 20px rgba(16, 24, 40, .08);
+    }
+    #cms-loading h1 { margin: 0 0 10px; font-size: 17px; color: #171a21; }
+    #cms-loading p { margin: 0 0 10px; }
+    #cms-loading code {
+      padding: 2px 6px;
+      border: 1px solid #e4e7ee;
+      border-radius: 5px;
+      background: #f2f4f7;
+      font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+      font-size: .9em;
+    }
+    #cms-loading .spinner {
+      width: 16px; height: 16px;
+      margin-right: 8px;
+      vertical-align: -3px;
+      border: 2px solid #d5dae4;
+      border-top-color: #3d5af1;
+      border-radius: 50%;
+      display: inline-block;
+      animation: cms-spin .8s linear infinite;
+    }
+    @keyframes cms-spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<!-- 加载中 / 加载失败提示 -->
+<div id="cms-loading">
+  <div class="box">
+    <h1><span class="spinner"></span>正在加载内容管理后台…</h1>
+    <p>若长时间停留在此页面，通常是 Decap CMS 的脚本未能从 CDN 加载成功
+       （常见于国内网络环境）。可尝试：</p>
+    <p>1. 检查浏览器控制台的网络错误；<br>
+       2. 把下方的 <code>unpkg.com</code> 地址换成自建镜像，或下载
+       <code>decap-cms.js</code> 放到本目录下引用。</p>
+    <p id="cms-error" style="display:none;color:#dc2626;"></p>
+  </div>
+</div>
+
+<script>
+  /* 主 CDN 失败时自动切换到备用 CDN。
+     Decap 会在脚本执行时自动初始化，因此两种加载方式都可正常工作。 */
+  var CMS_CDNS = [
+    'https://unpkg.com/decap-cms@^3.0.0/dist/decap-cms.js',
+    'https://cdn.jsdelivr.net/npm/decap-cms@^3.0.0/dist/decap-cms.js'
+  ];
+
+  function loadCMS(i) {
+    if (i >= CMS_CDNS.length) {
+      var el = document.getElementById('cms-error');
+      if (el) {
+        el.style.display = 'block';
+        el.textContent = '两个 CDN 均加载失败：' + CMS_CDNS.join(' 、 ');
+      }
+      return;
+    }
+    var s = document.createElement('script');
+    s.src = CMS_CDNS[i];
+    s.onload = function () {
+      var box = document.getElementById('cms-loading');
+      if (box) box.remove();
+    };
+    s.onerror = function () { loadCMS(i + 1); };
+    document.body.appendChild(s);
+  }
+
+  loadCMS(0);
+</script>
+
+<noscript>
+  <p style="padding:24px;font-family:sans-serif;">
+    内容管理后台需要启用 JavaScript 才能运行。
+  </p>
+</noscript>
+
+</body>
+</html>

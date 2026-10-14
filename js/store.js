@@ -13,6 +13,7 @@
     posts: [],
     source: 'unknown',   // 'http' | 'bundle' | 'none'
     error: null,
+    missing: [],         // manifest 中登记但读取失败的文件
     _promise: null,
 
     /** 加载全部文章（带缓存，重复调用返回同一 Promise） */
@@ -30,9 +31,33 @@
           files = Array.isArray(manifest) ? manifest : (manifest.posts || []);
           if (!files.length) throw new Error('manifest.json 中没有任何文章');
 
-          for (const f of files) {
-            raws[f] = await fetchText(CFG.postsDir + f);
+          // 并行拉取全部文章。
+          // 刻意使用 allSettled 而非 all：允许个别文件缺失（最常见的原因是删除了文章
+          // 却忘记同步 manifest.json）。若用 all，单个 404 就会让整站静默退回离线数据包，
+          // 表现为"删掉的文章还在、新写的文章不出现"，且没有任何报错。
+          const results = await Promise.allSettled(
+            files.map(f => fetchText(CFG.postsDir + f))
+          );
+
+          const missing = [];
+          files.forEach((f, i) => {
+            if (results[i].status === 'fulfilled') raws[f] = results[i].value;
+            else missing.push(f);
+          });
+
+          if (!Object.keys(raws).length) {
+            throw new Error('manifest.json 登记的文章全部无法读取');
           }
+
+          if (missing.length) {
+            this.missing = missing;
+            console.warn(
+              '[store] 以下文件在 manifest.json 中登记，但无法读取，已跳过：\n  ' +
+              missing.join('\n  ') +
+              '\n  → 如果这些文章已经被删除，请同步从 posts/manifest.json 中移除对应条目。'
+            );
+          }
+
           this.source = 'http';
         } catch (err) {
           const bundle = window.POST_BUNDLE;

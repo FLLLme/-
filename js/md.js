@@ -319,26 +319,64 @@
     if (!m) return { data: {}, body: text };
 
     const data = {};
-    m[1].split('\n').forEach(line => {
+    let pendingKey = null;    // 正在收集块状列表的字段名
+    let pendingItems = [];
+
+    // 只有确实收到条目时才落盘，避免把 `excerpt:` 这种空值写成空数组
+    const flushList = () => {
+      if (pendingKey && pendingItems.length) data[pendingKey] = pendingItems;
+      pendingKey = null;
+      pendingItems = [];
+    };
+
+    m[1].split('\n').forEach(rawLine => {
+      const line = rawLine.replace(/\s+$/, '');
+      if (!line.trim()) return;
+
+      // 块状列表项，例如：
+      //   tags:
+      //     - 前端
+      // Decap CMS 的 list 组件就是这种写法，必须支持，否则标签会被静默丢弃。
+      const item = line.match(/^\s*-\s+(.+)$/);
+      if (item && pendingKey) {
+        const v = item[1].trim().replace(/^['"]|['"]$/g, '');
+        if (v) pendingItems.push(v);
+        return;
+      }
+
       const kv = line.match(/^([A-Za-z0-9_-]+)\s*:\s*(.*)$/);
       if (!kv) return;
-      const key = kv[1];
-      let val = kv[2].trim();
 
-      if (/^\[.*\]$/.test(val)) {
-        // 行内数组：tags: [a, b]
-        val = val.slice(1, -1).split(',').map(s => s.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean);
-      } else if (/^['"].*['"]$/.test(val)) {
-        val = val.slice(1, -1);
-      } else if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(val)) {
-        // 日期保持字符串，避免时区偏移
-      } else if (/^-?\d+(\.\d+)?$/.test(val)) {
-        val = Number(val);
-      }
-      data[key] = val;
+      flushList();                       // 遇到新字段，收束上一个列表
+      const key = kv[1];
+      const val = kv[2].trim();
+
+      // 空值可能是一个块状列表的开头，挂起来观察后续行
+      if (val === '') { pendingKey = key; return; }
+
+      data[key] = coerceScalar(val);
     });
 
+    flushList();
+
     return { data, body: text.slice(m[0].length) };
+  }
+
+  /** 把 frontmatter 里的标量字符串转换成合适的类型 */
+  function coerceScalar(val) {
+    // 行内数组：tags: [a, b]
+    if (/^\[.*\]$/.test(val)) {
+      return val.slice(1, -1).split(',')
+        .map(s => s.trim().replace(/^['"]|['"]$/g, ''))
+        .filter(Boolean);
+    }
+    // 带引号的字符串
+    if (/^['"].*['"]$/.test(val)) return val.slice(1, -1);
+    // 日期保持字符串，避免被解析成时间戳后发生时区偏移
+    if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(val)) return val;
+    // 数字
+    if (/^-?\d+(\.\d+)?$/.test(val)) return Number(val);
+    return val;
   }
 
   window.MD = { render, enhance, parseFrontmatter, parseBlocks, inline };

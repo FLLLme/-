@@ -34,6 +34,23 @@ http://127.0.0.1:8080
 ├─ server.py               本地服务器 + DeepSeek 同源代理
 ├─ start.bat               Windows 一键启动
 │
+├─ .github/workflows/
+│   └─ sync-content.yml    ★ 把 content/posts/ 同步为 posts/ 并重建清单
+│
+├─ content/posts/          ★ 文章的唯一事实来源（由 CMS 后台读写）
+│   └─ *.md
+│
+├─ posts/                  前端消费的生成目录（由工作流自动维护，勿手改）
+│   ├─ *.md                从 content/posts/ 同步而来
+│   ├─ manifest.json       文章清单，供前端枚举
+│   └─ bundle.js           离线数据包（file:// 兜底）
+│
+├─ static/
+│   ├─ admin/              Decap CMS 后台
+│   │   ├─ index.html
+│   │   └─ config.yml
+│   └─ images/uploads/     后台插入的图片（首次上传时自动创建）
+│
 ├─ css/
 │   └─ style.css           全站样式（设计令牌 + 明暗主题 + 响应式）
 │
@@ -46,49 +63,96 @@ http://127.0.0.1:8080
 │   ├─ post.js             详情页逻辑：目录、阅读进度、上下篇、Twikoo
 │   └─ ai.js               AI 问答抽屉：流式对话、上下文注入、设置面板
 │
-├─ posts/
-│   ├─ manifest.json       文章清单（新增文章需在此登记）
-│   ├─ *.md                Markdown 源文件 ← 唯一事实来源
-│   └─ bundle.js           离线数据包（由 tools/bundle.py 生成，勿手改）
-│
 ├─ deploy/
 │   └─ cloudflare-worker.js  可选：线上共享代理，让访客无需自备 API Key
 │
 └─ tools/
+    ├─ sync_content.py     content/posts → posts 同步 + 重建 manifest
     ├─ bundle.py           从 posts/*.md 生成离线数据包
     └─ selftest.js         校验 Markdown 解析结果的命令行自检
 ```
 
+### 数据流向
+
+```
+你在后台写作                     GitHub Actions                  读者看到的
+─────────────                  ────────────────                ──────────
+Decap CMS  ──写入──▶  content/posts/*.md
+                            │
+                            │  推送触发 sync-content.yml
+                            ▼
+                      posts/*.md + manifest.json + bundle.js
+                            │
+                            │  提交回 main
+                            ▼
+                                                    ──▶  GitHub Pages 提供静态文件
+```
+
+**关键理解**：`content/posts/` 是源，`posts/` 是产物。
+你只应该编辑前者——后者会在每次推送时被工作流覆盖。
+
 ---
 
-## 三、写一篇新文章
+## 三、新增 / 编辑 / 删除文章
 
-1. 在 `posts/` 下新建 `我的文章.md`：
+**只操作 `content/posts/`。** 这里是文章的源，`posts/` 是工作流生成的产物，
+你手改后者会在下次推送时被覆盖。
 
-   ```markdown
-   ---
-   title: 文章标题
-   date: 2026-10-14
-   tags: [前端, 随笔]
-   excerpt: 一句话摘要，会显示在列表页卡片上。
-   ---
+### 方式一：用后台（推荐）
 
-   正文从这里开始，支持标准 Markdown 语法。
-   ```
+打开 `https://flllme.github.io/-/static/admin/` → 用 GitHub 账号登录 →
+左侧「文章」→ 新建 / 编辑 / 删除 → 保存。
 
-2. 在 `posts/manifest.json` 的 `posts` 数组中登记文件名：
+保存后 Decap 会直接提交到 `main`，工作流随即把改动同步到 `posts/`，
+约 1 分钟后线上生效。
 
-   ```json
-   { "posts": ["我的文章.md", "hello-blog.md"] }
-   ```
+### 方式二：直接改文件
 
-3. 刷新页面即可。若还需支持 `file://` 离线浏览，执行：
+在 `content/posts/` 下新建或编辑 `.md`，提交到 `main`，其余交给工作流。
 
-   ```bash
-   python tools/bundle.py
-   ```
+```markdown
+---
+title: 文章标题
+date: 2026-10-14
+tags:
+  - 前端
+  - 随笔
+excerpt: 一句话摘要，会显示在列表页卡片上。留空则自动截取正文前 110 字。
+---
 
-**可选 Frontmatter 字段**
+正文从这里开始，支持标准 Markdown 语法。
+```
+
+`tags` 支持两种写法，解析结果相同：
+
+```yaml
+tags: [前端, 随笔]      # 行内数组
+tags:                    # 块状列表（后台保存时用这种）
+  - 前端
+  - 随笔
+```
+
+### 关于 manifest.json
+
+**你不需要手工维护它。** `tools/sync_content.py` 每次都会按 `content/posts/`
+的实际内容重新生成，包括删除已不存在的条目。
+
+脚本内置了安全阀：**若 `content/posts/` 为空则中止并报错**，避免误把线上文章全部清除。
+
+> 前端加载器也做了容错：`store.js` 用 `Promise.allSettled` 拉取文章，
+> 清单里登记但读取失败的文件会被跳过并在控制台列出，**不会**导致整站回退到离线数据包。
+
+### 重命名文章（改 URL）
+
+文件名就是 URL 里的 `?id=`，重命名等于换了地址：
+
+- 该文章的 Twikoo 评论会失联（评论按 slug 归属）
+- 旧地址变成 404
+
+如果确实要改，建议：改文件名 → 提交 → 在 Twikoo 后台用
+「评论管理 → 迁移」把旧 slug 的评论搬到新 slug。
+
+### 可选 Frontmatter 字段
 
 | 字段 | 说明 |
 | --- | --- |
@@ -97,6 +161,17 @@ http://127.0.0.1:8080
 | `updated` | 更新日期，与 `date` 不同时会在详情页额外显示 |
 | `tags` | 标签数组，用于筛选与聚合 |
 | `excerpt` | 列表页摘要，缺省时自动截取正文前 110 字 |
+
+### 关于 `posts/bundle.js`
+
+它是 `file://` 离线浏览的兜底数据包，由 `tools/bundle.py` 从 `posts/*.md` 生成。
+**它不影响线上站点**——线上优先读取真实的 `.md` 文件，只有全部 `.md` 都读不到时才会用到它。
+
+改动文章内容后，若要维持 `file://` 模式的内容同步，执行：
+
+```bash
+python tools/bundle.py
+```
 
 ---
 
@@ -312,12 +387,83 @@ Twikoo 的后端可以独立部署（Vercel / 腾讯云函数 / Docker），与�
 
 ---
 
-## 十、技术要点
+## 十、内容管理后台与自动同步
+
+### 为什么需要这条流水线
+
+纯静态博客没有后端，浏览器无法枚举服务器上的目录，因此前端必须靠一份
+`posts/manifest.json` 清单才知道"有哪些文章"。
+
+而 Decap CMS 只能写内容文件，**不会维护这份清单**。于是新增的文章虽然进了仓库，
+却不会出现在列表页——这是最容易踩的坑。`sync-content.yml` 就是用来补上这一环的。
+
+### 工作流做了什么
+
+`.github/workflows/sync-content.yml`，触发条件是**向 main 推送且 `content/posts/` 有改动**：
+
+1. 检出仓库
+2. 运行 `tools/sync_content.py` —— 把 `content/posts/*.md` 同步到 `posts/`，
+   删除源中已不存在的文章，并按实际内容重建 `posts/manifest.json`
+3. 运行 `tools/bundle.py` —— 重建离线数据包 `posts/bundle.js`
+4. 若 `posts/` 有变化则提交并推送回 `main`（提交信息带 `[skip ci]`）
+
+### 为什么不会无限循环
+
+三重保险，任意一条生效都不会成环：
+
+1. `paths` 过滤器只匹配 `content/posts/**`，而工作流只改动 `posts/**`，不会再次触发自身
+2. 提交信息含 `[skip ci]`
+3. GitHub 规定：用 `GITHUB_TOKEN` 推送的提交**不会**触发新的工作流运行
+
+### 必须先开权限
+
+`Settings → Actions → General → Workflow permissions` 选择
+**Read and write permissions**。否则最后一步 `git push` 会因权限不足失败。
+
+### 本地手动执行
+
+工作流调用的就是普通命令行脚本，本地可随时跑：
+
+```bash
+python tools/sync_content.py --dry-run   # 只看将要发生的改动
+python tools/sync_content.py             # 实际执行
+python tools/bundle.py                   # 重建离线包
+```
+
+### 安全阀
+
+`sync_content.py` 在 `content/posts/` 为空时会**中止并报错**，绝不清空 `posts/`。
+这是为了防止"源目录被误删/改错路径"导致线上文章全被清掉。
+
+筛选规则：以下划线或点开头的文件（如 `_draft.md`）视为草稿，不参与发布。
+
+### 后台（Decap CMS）
+
+| 项目 | 值 |
+| --- | --- |
+| 入口 | `https://flllme.github.io/-/static/admin/` |
+| 仓库 | `FLLLme/-` |
+| 分支 | `main` |
+| 内容目录 | `content/posts/` |
+| OAuth 代理 | `https://my-blog-oauth.flllme-one.workers.dev` |
+| 字段 | 标题、日期、标签、摘要、正文 |
+
+`base_url` 只写到根地址，Decap 会自行拼接 `/auth` 与 `/callback`；
+**不要手动加 `/callback`**，否则会拼成 `/callback/callback`。
+
+后台页面本身是公开可访问的（纯静态），但**没有通过 GitHub OAuth 授权的人无法读写任何内容**，
+所有写操作都以登录者的 GitHub 权限为准。页面已加 `noindex`。
+
+---
+
+## 十一、技术要点
 
 | 决策 | 理由 |
 | --- | --- |
 | 零框架 | 博客交互密度低，原生 DOM 足够；首屏无 hydration 成本，包体积约 40 KB（不含 CDN 库） |
-| Markdown 存储 | Git 友好、可迁移、无数据库、无构建步骤 |
+| Markdown 双目录 | `content/posts/` 给 CMS 写，`posts/` 给前端读，用一次 CI 同步换取"后台可视化写作" |
+| 无运行时枚举 | 静态托管无法列目录，故用清单文件；清单由 CI 自动重建，人不碰 |
 | 双路径加载 | HTTP 走真实 `.md`，`file://` 走打包数据，两全其美 |
 | 内置解析器兜底 | CDN 不可达时页面仍能渲染，不依赖单一外部服务 |
 | 同源代理调 AI | 同时解决 CORS 与密钥安全，不牺牲流式体验 |
+| front matter 兼容两种列表 | 行内数组与块状列表都能解析，否则后台写出的标签会被静默丢弃 |

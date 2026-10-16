@@ -37,6 +37,12 @@
   --radius-sm: 6px;
   --header-h: 68px;
   --shadow: 0 1px 2px rgba(0, 0, 0, .03), 0 10px 30px rgba(0, 0, 0, .05);
+
+  /* 作品集画框
+     白色卡纸 + 双层发丝线 —— 只靠明度差做层次，不加任何彩色。 */
+  --frame-mat:  9px;         /* 卡纸留白宽度 */
+  --frame-line: #DEDEDE;     /* 画框线，比 --line 略深，浅底上才看得出 */
+  --frame-shadow: 0 1px 3px rgba(0, 0, 0, .045);
 }
 
 [data-theme="dark"] {
@@ -53,6 +59,10 @@
   --accent-bg:   rgba(240, 74, 98, .12);
   --code-bg:     #232220;
   --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 10px 30px rgba(0, 0, 0, .28);
+
+  /* 深色下画框反相：深卡纸 + 稍亮的框线，仍是纯明度层次 */
+  --frame-line: #3B3833;
+  --frame-shadow: 0 1px 3px rgba(0, 0, 0, .35);
 }
 
 /* --------------------------------------------------------------------------
@@ -495,19 +505,38 @@ main { display: block; }
   gap: 22px;
 }
 .work { display: block; }
+
+/* 画框：.work-thumb 是卡纸与外框，.work-frame 是画面区（负责裁剪）。
+   padding 让卡纸占据外框内部，因此卡片在栅格里的外廓尺寸完全不变——
+   加画框不会推动下方标题或改变栅格高度。 */
 .work-thumb {
   aspect-ratio: 16 / 10;
-  overflow: hidden;
+  padding: var(--frame-mat);
+  background: var(--surface);
+  border: 1px solid var(--frame-line);
   border-radius: var(--radius-sm);
-  background: var(--line-soft);
+  box-shadow: var(--frame-shadow);
 }
-.work-thumb img {
+/* 画面区：发丝内框 + 裁剪。
+   缩放动画只作用在这个盒子里的图片上，卡纸与内框保持不动，
+   这才是「照片在画框里放大」而不是「画框一起变大」。 */
+.work-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--line-soft);
+  border: 1px solid var(--frame-line);
+  border-radius: 2px;
+}
+.work-frame img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   transition: transform .5s ease;
 }
-.work:hover .work-thumb img { transform: scale(1.03); }
+.work:hover .work-frame img { transform: scale(1.03); }
+
 .work-title {
   display: block;
   margin-top: 11px;
@@ -525,9 +554,10 @@ main { display: block; }
   color: var(--text-mute);
 }
 
-/* 作品为空时的占位图块：只保留设计稿里那片图片区域的位置，不放任何文字 */
+/* 作品为空时的占位图块：只保留设计稿里那片图片区域的位置，不放任何文字。
+   画框照常绘制，于是占位态呈现为一个空画框。 */
 .work-placeholder { pointer-events: none; }
-.work-placeholder .work-thumb { background: var(--line-soft); }
+.work-placeholder .work-frame { background: var(--line-soft); }
 
 .friends {
   list-style: none;

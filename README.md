@@ -49,10 +49,14 @@ http://127.0.0.1:8080
 │   ├─ friends.json        朋友章汇总
 │   └─ bundle.js           离线数据包（file:// 兜底）
 │
+├─ admin/                  Decap CMS 后台（与博客同源部署）
+│   ├─ index.html          含两层补丁，详见下文
+│   ├─ config.yml          集合定义：文章 / 作品集 / 朋友章
+│   └─ decap-cms.js        自托管的 CMS 主程序（CDN 不可达时使用）
+│
+├─ assets/                 站点装饰素材
+│
 ├─ static/
-│   ├─ admin/              Decap CMS 后台
-│   │   ├─ index.html
-│   │   └─ config.yml
 │   └─ images/uploads/     后台插入的图片（首次上传时自动创建）
 │
 ├─ css/
@@ -61,14 +65,15 @@ http://127.0.0.1:8080
 ├─ js/
 │   ├─ config.js           站点集中配置 ← 改这里就够了
 │   ├─ app.js              公共工具：主题、顶栏、页脚、文本处理
-│   ├─ md.js               Markdown 渲染引擎（marked + 内置兜底解析器）
-│   ├─ store.js            数据层：加载并解析 Markdown 文章
+│   ├─ md.js               Markdown 渲染引擎（marked + 内置兜底解析器 + 输出消毒）
+│   ├─ store.js            数据层：加载并解析文章、作品集、朋友章
 │   ├─ main.js             列表页逻辑：搜索、标签筛选、卡片渲染
 │   ├─ post.js             详情页逻辑：目录、阅读进度、上下篇、Twikoo
 │   └─ ai.js               AI 问答抽屉：流式对话、上下文注入、设置面板
 │
 ├─ deploy/
-│   └─ cloudflare-worker.js  可选：线上共享代理，让访客无需自备 API Key
+│   └─ cloudflare-worker.js  可选：DeepSeek AI 的共享代理
+│                            ⚠️ 与 OAuth Worker 是两回事，后者不在本仓库
 │
 └─ tools/
     ├─ sync_content.py     content/posts → posts 同步 + 重建 manifest
@@ -556,4 +561,63 @@ python tools/bundle.py                   # 重建离线包
 | 内置解析器兜底 | CDN 不可达时页面仍能渲染，不依赖单一外部服务 |
 | 同源代理调 AI | 同时解决 CORS 与密钥安全，不牺牲流式体验 |
 | front matter 兼容两种列表 | 行内数组与块状列表都能解析，否则后台写出的标签会被静默丢弃 |
-2
+
+---
+
+## 十二、安全说明
+
+### 渲染出口统一消毒
+
+`js/md.js` 的 `render()` 是全站**唯一**的 Markdown 出口：`js/post.js`（文章正文）
+与 `js/ai.js`（AI 回答）都调用它。输出在返回前统一经过 `sanitize()` 消毒，
+因此调用方可以安全地直接赋给 `innerHTML`。
+
+消毒策略是**定向清除**而非全量标签白名单：
+
+| 清除项 | 原因 |
+| --- | --- |
+| `<script>` `<object>` `<embed>` `<base>` `<form>` `<meta>` `<style>` 等 | 可执行脚本或劫持相对路径 |
+| 所有 `on*` 事件属性 | XSS 的主要载体 |
+| URL 类属性中的 `javascript:` `vbscript:` `data:` `blob:` | 点击/加载即执行 |
+| `<iframe srcdoc>` | 内联 HTML 会在子文档中执行脚本 |
+| SVG 的 `<animate>` / `<set>` / `<foreignObject>` | 可改写 `href` 绕过协议检查 |
+| `style` 中的 `expression()` | 老旧浏览器可借此执行脚本 |
+
+为什么不引入 DOMPurify：本站的原则是「降级优先」，引入外部消毒库会新增一个
+「CDN 挂了就失去防护」的单点。为什么不用全量白名单：全量白名单容易误伤合法内容
+（代码高亮的 `span`、表格对齐的 `style`、脚注的 `id`、任务列表的 `input`……），
+而本站内容由站主本人撰写，真正要堵的是「能让脚本执行」的那几条路径。
+
+**回归验证**：仓库里跑不到（本项目无 npm 依赖），需在装有 `jsdom` 与 `marked`
+的环境下执行本地脚本 `design-preview/security-selftest.cjs`。
+判据是「消毒前后 DOM 完全相同」——既确认攻击载荷被中和，也确认渲染结果没被改动。
+
+### 作品与友链的 URL 协议白名单
+
+`tools/sync_extras.py` 在数据侧对 `href` / `url` / `image` / `avatar` 做协议校验，
+只放行 `http(s)`、`mailto`、`tel`、`sms`、`ftp` 与**站内相对路径**，
+其余一律丢弃并打印告警。不依赖前端的 `target="_blank"` 行为兜底。
+
+### 后台与 OAuth 代理
+
+| 项 | 位置 |
+| --- | --- |
+| 后台页面 | 仓库 `admin/`（与博客同源） |
+| OAuth Worker | **不在本仓库**，源码在本机 `C:\Users\31195\my-blog-oauth\` |
+
+OAuth Worker 已做到：`postMessage` 目标 origin 写死为站点 origin（不用 `*`）、
+`/auth` 生成并校验 `state`、`scope` 收窄为 `public_repo`、CORS 收窄到站点 origin。
+
+> ⚠️ 两个调试页（`oauth-debug.html`、`entry-debug.html`）已移出 `admin/`，
+> 放在不上传的 `design-preview/` 下，避免公开暴露内部握手流程。
+> 排查登录问题时仍可从本地打开使用。
+
+> ⚠️ `scope` 为 `public_repo`，**仅适用于公开仓库**。若把博客仓库转为私有，
+> 需把 Worker 的 `OAUTH_SCOPE` 环境变量改回 `repo`，或改用 GitHub App 只授权该仓库。
+
+### 尚未处理
+
+- 后台与博客同源（`/admin/` 与页面共用 origin）。要彻底切断，
+  需把后台部署到独立子域 `admin.flllme.xyz`。
+- 无 CSP 等响应头。GitHub Pages 不支持自定义响应头，
+  需在 Cloudflare 用 Transform Rules 注入。

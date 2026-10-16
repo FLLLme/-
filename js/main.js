@@ -133,9 +133,22 @@
     const grid = $('#friendsGrid');
     if (!section || !grid || !list.length) return;
 
-    grid.replaceChildren(...list.map(f => {
+    grid.replaceChildren(...list.map((f, i) => {
       const li = document.createElement('li');
       li.className = 'friend';
+
+      /* 只给排在第一位的友链加花卉边框。
+         装饰图形的形状由 CSS 的 mask 绘制（见 css/style.css 第 9.1 节），
+         这里只负责插入三个承载元素并打上修饰类，不涉及任何绘制逻辑。 */
+      if (i === 0) {
+        li.classList.add('friend--featured');
+        ['friend-frame', 'friend-flora', 'friend-bloom'].forEach(cls => {
+          const deco = document.createElement('span');
+          deco.className = cls;
+          deco.setAttribute('aria-hidden', 'true');
+          li.appendChild(deco);
+        });
+      }
 
       const avatar = document.createElement('span');
       avatar.className = 'friend-avatar';

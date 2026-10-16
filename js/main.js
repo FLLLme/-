@@ -79,15 +79,22 @@
             cell.rel = 'noopener';
           }
 
+          /* 画框结构：.work-thumb 是卡纸与外框，.work-frame 是画面区。
+             拆成两层是为了让 hover 缩放只作用于画面区内部的图片，
+             卡纸与内框保持不动（详见 css/style.css 的说明）。 */
           const thumb = document.createElement('div');
           thumb.className = 'work-thumb';
+
+          const frame = document.createElement('span');
+          frame.className = 'work-frame';
           if (w.image) {
             const img = document.createElement('img');
             img.src = w.image;
             img.alt = w.title || '';
             img.loading = 'lazy';
-            thumb.appendChild(img);
+            frame.appendChild(img);
           }
+          thumb.appendChild(frame);
 
           const name = document.createElement('span');
           name.className = 'work-title';
@@ -109,7 +116,10 @@
           cell.className = 'work work-placeholder';
           const thumb = document.createElement('div');
           thumb.className = 'work-thumb';
-          thumb.setAttribute('aria-hidden', 'true');
+          const frame = document.createElement('span');
+          frame.className = 'work-frame';
+          frame.setAttribute('aria-hidden', 'true');
+          thumb.appendChild(frame);
           cell.appendChild(thumb);
           return cell;
         });

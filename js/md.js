@@ -2,11 +2,207 @@
    md.js — Markdown 渲染引擎
    策略：优先使用 CDN 上的 marked；若其未加载成功（离线/CDN 被拦截），
         自动回退到内置的轻量解析器，保证任何环境下页面都能正常渲染。
+
+   安全：两条渲染路径的输出最终都会经过 sanitize() 消毒再交给 innerHTML。
+        marked 与内置解析器都只负责「Markdown → HTML 字符串」，不是消毒库。
    ========================================================================== */
 (function () {
   'use strict';
 
   const esc = window.App.escapeHtml;
+
+  /* ======================================================================
+     零、输出消毒（XSS 防护）
+     ======================================================================
+
+     为什么需要
+     ----------
+     marked 的定位是「Markdown → HTML 字符串」，官方明确说明它不做 XSS 消毒，
+     默认放行正文里的原始 HTML。因此 <img src=x onerror=...> 会原样进入 DOM 并执行。
+     内置兜底解析器虽然对文本做了转义，但对链接的 URL 协议没有白名单，
+     [x](javascript:...) 会被原样输出。
+
+     为什么不用 DOMPurify
+     --------------------
+     本站的既定原则是「降级优先」：任何 CDN 不可用时页面必须仍然可读、可控。
+     引入外部消毒库会新增一个「CDN 挂了就失去防护」的单点，因此这里用内置实现。
+
+     策略：定向清除，而不是全量白名单
+     --------------------------------
+     全量标签白名单很容易误伤合法内容（代码高亮产生的 span、表格对齐的 style、
+     脚注的 id、任务列表的 input……），而本站内容由站主本人撰写，
+     真正要堵的是「能让脚本执行」的那几条路径。因此这里精确清除：
+
+       · 危险元素整棵子树移除（script / object / embed / base / form ...）
+       · 所有 on* 事件属性移除          ← XSS 的主要载体
+       · URL 类属性做协议白名单         ← javascript: / data: 等
+       · srcdoc 移除                    ← iframe 内联 HTML 可执行脚本
+       · style 中的 expression()/javascript: 清除
+
+     副作用：无。合法正文的标签、类名、行内样式一律保留。
+     ====================================================================== */
+
+  /* 整棵子树直接移除的元素。
+     注意 iframe 不在其中——视频嵌入等场景会用到，改为逐属性清洗。 */
+  const DROP_TAGS = [
+    'script', 'style', 'object', 'embed', 'base', 'meta', 'link',
+    'title', 'noscript', 'template', 'form', 'frame', 'frameset',
+    'applet', 'param', 'marquee'
+  ];
+
+  /* SVG 里能改写 href 的元素，可绕过链接协议检查：
+     <a><animate attributeName="href" values="javascript:..."/></a> */
+  const DROP_SVG_TAGS = ['animate', 'set', 'animateTransform', 'animateMotion', 'foreignObject'];
+
+  /* 需要做协议检查的属性（含 SVG 的 xlink:href 与历史遗留属性） */
+  const URL_ATTRS = [
+    'href', 'xlink:href', 'src', 'poster', 'action', 'formaction',
+    'background', 'dynsrc', 'lowsrc', 'data'
+  ];
+
+  /* iframe 上只保留这些属性。srcdoc 会把 HTML 直接注入子文档并执行脚本，必须去掉 */
+  const IFRAME_ATTRS = new Set([
+    'src', 'width', 'height', 'title', 'class', 'id', 'style',
+    'frameborder', 'allow', 'allowfullscreen', 'loading', 'referrerpolicy'
+  ]);
+
+  /* 图片内联 data: 允许的 MIME。刻意不含 svg+xml——SVG 可携带脚本，
+     放进 <iframe> 或 <object> 就能执行。 */
+  const SAFE_DATA_IMAGE = /^data:image\/(?:png|jpe?g|gif|webp|bmp|avif)[;,]/i;
+
+  const SAFE_PROTOCOLS = /^(?:https?|mailto|tel|sms|ftp|ftps):/i;
+
+  /**
+   * 判断一个 URL 是否安全。
+   * 无协议的相对路径、锚点、查询串一律放行（本站大量使用相对路径引用图片）。
+   */
+  function isSafeUrl(value, isImageSrc) {
+    const v = String(value == null ? '' : value).trim();
+    if (!v) return false;
+
+    /* 去掉控制字符与空白：`java\nscript:` 这类绕过写法会被拆散后识别出来 */
+    const compact = v.replace(/[\u0000-\u0020\u007F\u00A0]+/g, '');
+    const lower = compact.toLowerCase();
+
+    if (lower.startsWith('javascript:') || lower.startsWith('vbscript:')
+        || lower.startsWith('blob:') || lower.startsWith('filesystem:')) return false;
+
+    if (lower.startsWith('data:')) return Boolean(isImageSrc) && SAFE_DATA_IMAGE.test(compact);
+
+    /* 有协议头的，必须在白名单内 */
+    if (/^[a-z][a-z0-9+.-]*:/i.test(compact)) return SAFE_PROTOCOLS.test(lower);
+
+    /* 无协议：相对路径 / 锚点 / 查询串 */
+    return true;
+  }
+
+  /** 清洗 style 里的表达式（老旧浏览器可借此执行脚本） */
+  function sanitizeStyle(value) {
+    return String(value)
+      .replace(/expression\s*\(/gi, '')
+      .replace(/javascript\s*:/gi, '')
+      .replace(/vbscript\s*:/gi, '');
+  }
+
+  /**
+   * 把 <template> 的内容序列化成 HTML 字符串。
+   *
+   * 为什么不直接读 innerHTML：`template.content` 是 DocumentFragment，
+   * 而 DocumentFragment **没有** innerHTML 属性（浏览器里同样没有）。
+   * 也不能把它塞进一个游离的 <div> 再读 innerHTML —— 那样元素会带着
+   * 攻击者给的 src 进入一个"活"的文档，可能触发一次不受控的资源请求。
+   * 所以这里逐个子节点显式序列化：元素用 outerHTML，文本节点重新转义。
+   */
+  function serializeFragment(frag) {
+    let out = '';
+    Array.prototype.forEach.call(frag.childNodes, node => {
+      switch (node.nodeType) {
+        case 1:   // 元素
+          out += node.outerHTML;
+          break;
+        case 3:   // 文本
+          /* & < > " 都要转义回去。这既保证 innerHTML 重新解析时不走样，
+             也让输出与 marked 的写法逐字节一致（marked 把双引号写成 &quot;），
+             便于用「消毒前后文本完全相同」来验证没有改动渲染结果。 */
+          out += node.data
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+          break;
+        case 8:   // 注释
+          out += '<!--' + node.data + '-->';
+          break;
+        default:
+          break;
+      }
+    });
+    return out;
+  }
+
+  /**
+   * 对渲染结果消毒。
+   * 用 <template> 承载：其内容处于惰性文档中，脚本不会执行、图片不会加载，
+   * 因此解析过程本身不产生任何副作用。
+   */
+  function sanitize(html) {
+    const source = String(html == null ? '' : html);
+
+    /* 消毒依赖 DOM。浏览器里永远有 DOM，唯一会走到这里的是无 DOM 的 Node 环境
+       （tools/selftest.js 之类）。此时**失败即封闭**：宁可把输出降级成纯文本，
+       也不能返回未经消毒的 HTML。 */
+    if (typeof document === 'undefined' || typeof document.createElement !== 'function') {
+      if (window.console && console.error) {
+        console.error('[md] 当前环境没有 DOM，无法消毒。为保证安全，输出已降级为纯文本。');
+      }
+      return esc(source);
+    }
+
+    const tpl = document.createElement('template');
+    tpl.innerHTML = source;
+    const root = tpl.content;
+
+    /* 1) 危险元素整棵子树移除 */
+    DROP_TAGS.forEach(tag => {
+      root.querySelectorAll(tag).forEach(el => el.remove());
+    });
+    DROP_SVG_TAGS.forEach(tag => {
+      root.querySelectorAll(tag).forEach(el => el.remove());
+    });
+
+    /* 2) 逐元素清洗属性 */
+    root.querySelectorAll('*').forEach(el => {
+      const tag = el.tagName.toLowerCase();
+
+      Array.from(el.attributes).forEach(attr => {
+        const name = attr.name.toLowerCase();
+        const value = attr.value;
+
+        /* 2.1 事件处理器：XSS 的主要载体，无条件移除 */
+        if (name.startsWith('on')) { el.removeAttribute(attr.name); return; }
+
+        /* 2.2 iframe 内联文档可执行脚本 */
+        if (name === 'srcdoc') { el.removeAttribute(attr.name); return; }
+
+        /* 2.3 iframe 只保留白名单属性 */
+        if (tag === 'iframe' && !IFRAME_ATTRS.has(name)) { el.removeAttribute(attr.name); return; }
+
+        /* 2.4 URL 类属性做协议检查 */
+        if (URL_ATTRS.includes(name)) {
+          if (!isSafeUrl(value, name === 'src')) el.removeAttribute(attr.name);
+          return;
+        }
+
+        /* 2.5 行内样式去掉可执行表达式 */
+        if (name === 'style') {
+          const cleaned = sanitizeStyle(value);
+          if (cleaned !== value) el.setAttribute(attr.name, cleaned);
+        }
+      });
+    });
+
+    return serializeFragment(root);
+  }
 
   /* ======================================================================
      一、内置轻量 Markdown 解析器（兜底）
@@ -24,11 +220,18 @@
     });
 
     // 图片 → 链接 → 强调 → 删除线
+    // 图片：src 不安全时退化为 alt 文字（alt 已在前面的 esc() 中转义过）
     s = s.replace(/!\[([^\]]*)\]\(([^)\s]+)(?:\s+&quot;([^&]*)&quot;)?\)/g,
-      (_, alt, src, title) => `<img src="${src}" alt="${alt}"${title ? ` title="${title}"` : ''} loading="lazy">`);
+      (_, alt, src, title) => isSafeUrl(src, true)
+        ? `<img src="${src}" alt="${alt}"${title ? ` title="${title}"` : ''} loading="lazy">`
+        : alt);
 
+    // 链接：href 不安全时只保留链接文字，不生成可点击元素。
+    // 这是 L-2 的源头修复——此前的输出会让 javascript: 直接穿透到 href。
     s = s.replace(/\[([^\]]+)\]\(([^)\s]+)(?:\s+&quot;([^&]*)&quot;)?\)/g,
-      (_, t, href, title) => `<a href="${href}"${title ? ` title="${title}"` : ''}>${t}</a>`);
+      (_, t, href, title) => isSafeUrl(href)
+        ? `<a href="${href}"${title ? ` title="${title}"` : ''}>${t}</a>`
+        : t);
 
     s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
     s = s.replace(/__([^_]+)__/g, '<strong>$1</strong>');
@@ -201,25 +404,33 @@
     return !!(window.marked && typeof window.marked.parse === 'function');
   }
 
-  /** Markdown → HTML */
+  /**
+   * Markdown → 已消毒的 HTML
+   *
+   * 这是全站唯一的 Markdown 出口：post.js（文章正文）与 ai.js（AI 回答）
+   * 都调用它。渲染结果在这里统一消毒，调用方可以安全地直接赋给 innerHTML。
+   */
   function render(md) {
     const source = String(md || '');
+    let html = null;
+
     if (useMarked()) {
       try {
         const opts = { gfm: true, breaks: false, async: false };
-        let html = null;
         // marked v5+：使用 marked.parse；更早版本：直接调用 marked()
         if (typeof window.marked.parse === 'function') {
           html = window.marked.parse(source, opts);
         } else if (typeof window.marked === 'function') {
           html = window.marked(source, opts);
         }
-        if (typeof html === 'string' && html.trim()) return html;
       } catch (err) {
         console.warn('[md] marked 渲染失败，回退到内置解析器', err);
+        html = null;
       }
     }
-    return parseBlocks(source);
+
+    if (typeof html !== 'string' || !html.trim()) html = parseBlocks(source);
+    return sanitize(html);
   }
 
   /** 生成稳定的标题 id（兼容中文） */
@@ -379,5 +590,5 @@
     return val;
   }
 
-  window.MD = { render, enhance, parseFrontmatter, parseBlocks, inline };
+  window.MD = { render, enhance, parseFrontmatter, parseBlocks, inline, sanitize, isSafeUrl };
 })();

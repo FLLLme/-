@@ -54,7 +54,9 @@ http://127.0.0.1:8080
 │   ├─ config.yml          集合定义：文章 / 作品集 / 朋友章
 │   └─ decap-cms.js        自托管的 CMS 主程序（CDN 不可达时使用）
 │
-├─ assets/                 站点装饰素材
+├─ assets/                 装饰素材
+│   ├─ higanbana-line.jpg        背景的彼岸花线稿
+│   └─ friend-frame-*.svg        朋友章首位的花卉边框（由 tools 脚本生成）
 │
 ├─ static/
 │   └─ images/uploads/     后台插入的图片（首次上传时自动创建）
@@ -72,13 +74,16 @@ http://127.0.0.1:8080
 │   └─ ai.js               AI 问答抽屉：流式对话、上下文注入、设置面板
 │
 ├─ deploy/
-│   └─ cloudflare-worker.js  可选：DeepSeek AI 的共享代理
-│                            ⚠️ 与 OAuth Worker 是两回事，后者不在本仓库
+│   ├─ cloudflare-worker.js    可选：DeepSeek AI 的共享代理
+│   │                          ⚠️ 与 OAuth Worker 是两回事，后者不在本仓库
+│   └─ security-headers.md     Cloudflare 安全响应头（CSP 等）的配置说明
 │
 └─ tools/
     ├─ sync_content.py     content/posts → posts 同步 + 重建 manifest
     ├─ sync_extras.py      content/works、content/friends → posts/*.json 汇总
     ├─ bundle.py           从 posts/*.md 生成离线数据包
+    ├─ make_friend_frame.py 生成朋友章花卉边框的 SVG 素材
+    ├─ csp_hash.js         计算内联脚本的 CSP 哈希（改过之后必须重跑）
     └─ selftest.js         校验 Markdown 解析结果的命令行自检
 ```
 
@@ -220,6 +225,29 @@ python tools/bundle.py
 | 站点地址 | 否 | 填了点击网名即跳转 |
 | 网站简介 | 否 | 显示在网名下方 |
 | 排序权重 | 否 | 数字越小越靠前，留空按网名排序 |
+
+### 首位的花卉边框
+
+**列表里的第一位会自动带上一圈花卉边框，其余不加。** 不需要任何配置，
+也不需要额外的字段——边框跟着"当前排在第一位的那条"走。
+
+边框由两部分组成：
+
+- **形状**：`assets/friend-frame-*.svg` 四块素材（上下花边、左右花边、花卉簇、彼岸花）。
+  它们都画成「黑线 + 透明底」，在 CSS 里当 `mask-image` 用，颜色由 CSS 变量提供。
+  这样一份素材同时适配明暗两种主题，花边也能随卡片宽度无限平铺、不会拉伸变形。
+- **颜色**：`--frame-ornate`（线稿色）与 `--accent`（朱砂红的彼岸花）。
+
+想改花边的疏密或造型，改 `tools/make_friend_frame.py` 里的几何参数后重新执行：
+
+```bash
+python tools/make_friend_frame.py
+```
+
+改完用 `design-preview/friend-frame-preview.html` 看效果（该目录不上传）。
+
+> 注：边框是按「显示顺序的第一条」判断的，所以调整友链的排序权重会让边框换到别条上。
+> 若希望固定在某一条，需要给后台加一个布尔字段——目前没做。
 
 ### 空状态的行为
 
@@ -514,6 +542,7 @@ python tools/sync_content.py --dry-run   # 只看将要发生的改动
 python tools/sync_content.py             # 实际执行
 python tools/sync_extras.py              # 汇总作品集与朋友章
 python tools/bundle.py                   # 重建离线包
+node tools/csp_hash.js                   # 重算内联脚本的 CSP 哈希
 ```
 
 ### 安全阀
@@ -615,9 +644,23 @@ OAuth Worker 已做到：`postMessage` 目标 origin 写死为站点 origin（�
 > ⚠️ `scope` 为 `public_repo`，**仅适用于公开仓库**。若把博客仓库转为私有，
 > 需把 Worker 的 `OAUTH_SCOPE` 环境变量改回 `repo`，或改用 GitHub App 只授权该仓库。
 
+### 安全响应头（Cloudflare）
+
+GitHub Pages 不支持自定义响应头，所以 CSP 等头部需要由 Cloudflare 注入。
+完整配置见 **[`deploy/security-headers.md`](deploy/security-headers.md)**，要点：
+
+- 用一条 **Transform Rules → 修改响应头** 规则，只匹配 `www.flllme.xyz`
+- 先上 `Content-Security-Policy-Report-Only`（只报告不拦截，零风险），
+  确认无误伤后再改成 `Content-Security-Policy`
+- 同时注入 `X-Content-Type-Options`、`X-Frame-Options`、`Referrer-Policy`
+
+⚠️ CSP 的 `script-src` 用 **SHA-256 哈希白名单**放行内联脚本（主题预设那一小段）。
+**改动那段脚本后必须重跑 `node tools/csp_hash.js` 并更新规则**，
+否则它会因哈希不匹配被静默拒绝执行，症状是深色模式闪一下白。
+
 ### 尚未处理
 
-- 后台与博客同源（`/admin/` 与页面共用 origin）。要彻底切断，
+- **后台与博客同源**（`/admin/` 与页面共用 origin）。要彻底切断，
   需把后台部署到独立子域 `admin.flllme.xyz`。
-- 无 CSP 等响应头。GitHub Pages 不支持自定义响应头，
-  需在 Cloudflare 用 Transform Rules 注入。
+  注意：渲染出口已消毒（见上），因此这一项现在是纵深防御，
+  而非可直接利用的漏洞。

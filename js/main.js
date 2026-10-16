@@ -138,11 +138,13 @@
       li.className = 'friend';
 
       /* 只给排在第一位的友链加花卉边框。
-         装饰图形的形状由 CSS 的 mask 绘制（见 css/style.css 第 9.1 节），
-         这里只负责插入三个承载元素并打上修饰类，不涉及任何绘制逻辑。 */
+         边框直接用设计稿本身（assets/friend-frame.png），形状与颜色都在图片里，
+         这里只负责插入两个承载层并打上修饰类。
+         拆成两层是为了深色模式：线稿层整体反相成「深底浅线」，
+         而朱砂红彼岸花单独一层、不参与反相，否则会变成青色。 */
       if (i === 0) {
         li.classList.add('friend--featured');
-        ['friend-frame', 'friend-flora', 'friend-bloom'].forEach(cls => {
+        ['friend-frame', 'friend-bloom'].forEach(cls => {
           const deco = document.createElement('span');
           deco.className = cls;
           deco.setAttribute('aria-hidden', 'true');

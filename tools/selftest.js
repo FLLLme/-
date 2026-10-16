@@ -1,5 +1,12 @@
 /* 自检脚本：在 Node 中加载 md.js 的内置解析器，检查各文章的渲染结果
-   用法：node tools/selftest.js */
+   用法：node tools/selftest.js
+
+   说明：这里调用的是 MD.parseBlocks() 而不是 MD.render()。
+   本脚本的目的是检查**解析结果**（标题层级、代码围栏、表格有没有被漏掉），
+   而 render() 之后还要过一道基于 DOM 的输出消毒，Node 环境里没有 DOM。
+   消毒的回归验证请用 design-preview/security-selftest.cjs（需要 jsdom）。
+   无 window.marked 时 render() 的内部实现就是 sanitize(parseBlocks(...))，
+   因此这里检查 parseBlocks 的产物是等价的。 */
 const fs = require('fs');
 const vm = require('vm');
 const path = require('path');
@@ -31,7 +38,7 @@ let failures = 0;
 for (const f of files) {
   const raw = fs.readFileSync(`${ROOT}/posts/${f}`, 'utf8');
   const { data, body } = MD.parseFrontmatter(raw);
-  const html = MD.render(body);
+  const html = MD.parseBlocks(body);
 
   const count = (re) => (html.match(re) || []).length;
   const expectTable = EXPECT_TABLES[f];

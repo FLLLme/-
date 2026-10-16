@@ -38,6 +38,7 @@ sync_extras.py — 把 content/works/ 与 content/friends/ 汇总为 posts/*.jso
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -49,11 +50,59 @@ ALLOWED_FIELDS = {
     "friends": ["title", "url", "avatar", "desc", "order"],
 }
 
+# 哪些字段是 URL，需要做协议检查
+URL_FIELDS = {
+    "works":   ["image", "href"],
+    "friends": ["avatar", "url"],
+}
+
+# 允许的协议。无协议的相对路径（本站图片都用相对路径）另行放行。
+SAFE_PROTOCOLS = re.compile(r"^(?:https?|mailto|tel|sms|ftp|ftps):", re.I)
+
+# 明确拒绝的危险协议
+DANGEROUS_PROTOCOLS = ("javascript:", "vbscript:", "data:", "blob:", "filesystem:")
+
 # (集合名, 源目录, 输出文件)
 COLLECTIONS = [
     ("works",   ROOT / "content" / "works",   ROOT / "posts" / "works.json"),
     ("friends", ROOT / "content" / "friends", ROOT / "posts" / "friends.json"),
 ]
+
+
+def sanitize_url(value: str) -> str:
+    """URL 字段的协议白名单。
+
+    为什么要在数据侧做
+    ------------------
+    前端渲染用 target="_blank"，浏览器不允许在新上下文里执行 javascript:，
+    因此当前不可直接触发。但这是"依赖前端行为兜底"，不该作为安全边界：
+    换一种渲染方式、或在别处复用这份数据，防护就没了。
+
+    放行：http(s): / mailto: / tel: / sms: / ftp(s):，以及无协议的相对路径。
+    拒绝：javascript: / vbscript: / data: / blob: / filesystem: 及一切未知协议。
+    非法值返回空字符串——输出 schema 保持不变，只是该字段为空。
+    """
+    v = (value or "").strip()
+    if not v:
+        return ""
+
+    # 折叠掉控制字符与空白：`java\nscript:` 这类拆分写法会被还原后识别出来
+    compact = re.sub(r"[\x00-\x20\x7f\u00a0]+", "", v)
+    lower = compact.lower()
+
+    if lower.startswith(DANGEROUS_PROTOCOLS):
+        print(f"[extras] 已丢弃危险 URL（{v[:60]}）", file=sys.stderr)
+        return ""
+
+    # 有协议头的必须在白名单内
+    if re.match(r"^[a-z][a-z0-9+.\-]*:", lower):
+        if SAFE_PROTOCOLS.match(lower):
+            return v
+        print(f"[extras] 已丢弃未知协议的 URL（{v[:60]}）", file=sys.stderr)
+        return ""
+
+    # 无协议：相对路径 / 锚点 / 查询串，放行
+    return v
 
 
 def collect_sources(src: Path):
@@ -80,14 +129,18 @@ def to_int(value):
 
 
 def normalize(name, data, fallback_title):
-    """只保留白名单字段，并把除 order 外的值统一成字符串。"""
+    """只保留白名单字段，并把除 order 外的值统一成字符串；URL 字段过协议白名单。"""
     item = {}
+    url_fields = URL_FIELDS.get(name, ())
+
     for key in ALLOWED_FIELDS[name]:
         raw = data.get(key)
         if key == "order":
             item[key] = to_int(raw)
-        else:
-            item[key] = "" if raw is None else str(raw).strip()
+            continue
+
+        text = "" if raw is None else str(raw).strip()
+        item[key] = sanitize_url(text) if key in url_fields else text
 
     # 后台的文件夹集合强制要求 title 作为条目标识，但保险起见再兜一次，
     # 免得渲染出没有文字的卡片

@@ -43,6 +43,10 @@
   --frame-mat:  9px;         /* 卡纸留白宽度 */
   --frame-line: #DEDEDE;     /* 画框线，比 --line 略深，浅底上才看得出 */
   --frame-shadow: 0 1px 3px rgba(0, 0, 0, .045);
+
+  /* 朋友章首位的花卉边框：线稿颜色。
+     比正文色浅、比描边色深，既有线稿的清晰度，又不会与正文抢视线。 */
+  --frame-ornate: #6B6863;
 }
 
 [data-theme="dark"] {
@@ -63,6 +67,9 @@
   /* 深色下画框反相：深卡纸 + 稍亮的框线，仍是纯明度层次 */
   --frame-line: #3B3833;
   --frame-shadow: 0 1px 3px rgba(0, 0, 0, .35);
+
+  /* 深色下的花边线稿：转成暖灰，在深底上清晰但不刺眼 */
+  --frame-ornate: #A9A29A;
 }
 
 /* --------------------------------------------------------------------------
@@ -582,6 +589,108 @@ main { display: block; }
 .friend-name { font-size: 14.5px; transition: color .2s; }
 .friend-name:hover { color: var(--accent); }
 .friend-desc { font-size: 12.5px; color: var(--text-mute); }
+
+/* --------------------------------------------------------------------------
+   9.1 朋友章 · 首位的花卉边框
+   --------------------------------------------------------------------------
+   只给列表里的第一项加边框，其余保持原样。
+
+   三块装饰图形（assets/friend-frame-*.svg）都是「黑线 + 透明底」，
+   在 CSS 里当 mask 用，颜色由元素的 background 提供。这样做的好处：
+     · 一份素材同时适配明暗主题 —— 颜色交给 CSS 变量，不必出两套图
+     · 朱砂红与线稿色可以分开设置
+     · 花边随卡片宽度无限平铺，任何宽度都不会被拉伸变形
+
+   结构（由 js/main.js 注入，仅在首位插入）：
+     .friend--featured      双线画框：自身 border 为外框，::before 为内框
+       .friend-frame        ::before 上花边、::after 下花边
+       .friend-flora        ::before 右上花簇、::after 左下花簇
+       .friend-bloom        朱砂红彼岸花（右上）
+   -------------------------------------------------------------------------- */
+.friend--featured {
+  position: relative;
+  /* 内边距 = 花边宽度(18) + 内框到内容的余量(6)。花边画满外框内侧，
+     内框线正好压在花边的里沿，与参考图「外线—花草—内线」的层次一致。 */
+  padding: 24px 26px;
+  background: var(--surface);
+  border: 1px solid var(--frame-ornate);
+  border-radius: var(--radius-sm);
+}
+/* 内框：与外框构成双线，中间夹住上下花边 */
+.friend--featured::before {
+  content: '';
+  position: absolute;
+  inset: 18px;
+  border: 1px solid var(--frame-ornate);
+  border-radius: 3px;
+  pointer-events: none;
+}
+/* 花边允许溢出到画框外一点点，所以不加 overflow:hidden */
+.friend-frame,
+.friend-flora {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+/* 四条花边叠在同一个元素上：四层 mask 取并集（默认合成方式就是并集）。
+   上下用横向素材、左右用竖向素材——直接拿横向的去铺竖边会被压扁。
+   竖边写 `no-repeat round`：横向不重复（否则 18px 宽的竖条会在横向也铺满，
+   把整张卡糊住），纵向用 round 整块缩放凑成整数份，避免半个花头被切断。 */
+.friend-frame::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--frame-ornate);
+  -webkit-mask-image: url('../assets/friend-frame-edge.svg'),
+                      url('../assets/friend-frame-edge.svg'),
+                      url('../assets/friend-frame-edge-v.svg'),
+                      url('../assets/friend-frame-edge-v.svg');
+          mask-image: url('../assets/friend-frame-edge.svg'),
+                      url('../assets/friend-frame-edge.svg'),
+                      url('../assets/friend-frame-edge-v.svg'),
+                      url('../assets/friend-frame-edge-v.svg');
+  -webkit-mask-repeat: repeat-x, repeat-x, no-repeat round, no-repeat round;
+          mask-repeat: repeat-x, repeat-x, no-repeat round, no-repeat round;
+  -webkit-mask-size: 56px 18px, 56px 18px, 18px 56px, 18px 56px;
+          mask-size: 56px 18px, 56px 18px, 18px 56px, 18px 56px;
+  -webkit-mask-position: left top, left bottom, left top, right top;
+          mask-position: left top, left bottom, left top, right top;
+}
+
+/* 对角两簇花：右上、左下，稍微溢出画框，呼应参考图里的破框感 */
+.friend-flora::before,
+.friend-flora::after {
+  content: '';
+  position: absolute;
+  width: 62px;
+  height: 62px;
+  background: var(--frame-ornate);
+  -webkit-mask-image: url('../assets/friend-frame-cluster.svg');
+          mask-image: url('../assets/friend-frame-cluster.svg');
+  -webkit-mask-repeat: no-repeat;
+          mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+          mask-size: contain;
+}
+.friend-flora::before { top: -12px; right: -10px; }
+.friend-flora::after { bottom: -12px; left: -10px; transform: scale(-1, -1); }
+
+/* 朱砂红彼岸花：落在右上花簇之中，与站标同一意象 */
+.friend-bloom {
+  position: absolute;
+  top: 1px;
+  right: 3px;
+  width: 30px;
+  height: 30px;
+  background: var(--accent);
+  pointer-events: none;
+  -webkit-mask-image: url('../assets/friend-frame-bloom.svg');
+          mask-image: url('../assets/friend-frame-bloom.svg');
+  -webkit-mask-repeat: no-repeat;
+          mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+          mask-size: contain;
+}
 
 /* --------------------------------------------------------------------------
    10. 状态：骨架 / 空态 / 离线

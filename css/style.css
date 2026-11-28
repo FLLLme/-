@@ -1302,6 +1302,24 @@ main { display: block; }
   .nav a:not(:first-child)::before { left: -2px; }
   .nav a.active::after { left: 9px; right: 9px; }
 
+  /* 窄屏下导航项放不平：6 个标签在 375px 上需要约 300px，
+     而 logo + 主题按钮之后只剩 175px。原来的行为是被 flex 压成多行，
+     行高从 38px 涨到 85px，把固定高度的顶栏顶变形。
+     改为「不换行 + 横向滚动」，标签完整性优先。
+     padding-bottom 是给选中态下划线留的位置 —— 它定位在 bottom:-3px，
+     加了 overflow 就会被裁掉。 */
+  .nav {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 5px;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .nav::-webkit-scrollbar { display: none; }
+  .nav a { flex: 0 0 auto; white-space: nowrap; }
+
   .hero { padding: 48px 0 34px; }
   .hero-sub { letter-spacing: .22em; text-indent: .22em; }
   .hero-links { gap: 28px; margin-top: 28px; }

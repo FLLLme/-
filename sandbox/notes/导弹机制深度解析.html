@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SimplePlanes 2 · 导弹机制深度解析</title>
+<style>
+:root{
+  --bg:#f5f6f8; --surface:#ffffff; --surface-alt:#f0f2f5;
+  --text:#1f2329; --text-sub:#555e6b; --text-mute:#8a929c;
+  --border:#e2e5ea; --accent:#2563eb; --accent-soft:#eaf1ff;
+  --red:#c0392b; --red-soft:#fdecea; --green:#1e7a52; --green-soft:#e7f5ee;
+  --amber:#9a6700; --amber-soft:#fdf3dc; --purple:#6d3fb5; --purple-soft:#f1eafa;
+  --radius:12px; --shadow:0 1px 3px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.04);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  background:var(--bg); color:var(--text); line-height:1.75; font-size:15px;
+  -webkit-font-smoothing:antialiased; padding-bottom:60px;
+}
+.wrap{max-width:920px;margin:0 auto;padding:0 20px}
+
+/* header */
+header{
+  background:linear-gradient(135deg,#1e3a6d,#2563eb); color:#fff;
+  padding:46px 0 40px; margin-bottom:32px;
+}
+header .wrap{display:flex;flex-direction:column;gap:8px}
+header h1{font-size:30px;font-weight:700;letter-spacing:.5px;line-height:1.3}
+header .sub{font-size:14px;opacity:.85;font-weight:400}
+header .tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+header .tag{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.25);
+  padding:4px 11px;border-radius:20px;font-size:12px}
+
+/* nav */
+nav{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:var(--shadow);padding:14px 18px;margin-bottom:28px;
+  display:flex;flex-wrap:wrap;gap:8px}
+nav a{color:var(--accent);text-decoration:none;font-size:13px;padding:5px 11px;
+  border-radius:7px;background:var(--accent-soft);transition:.15s}
+nav a:hover{background:var(--accent);color:#fff}
+
+/* section */
+section{margin-bottom:34px;scroll-margin-top:16px}
+h2{font-size:21px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:10px}
+h2 .num{display:inline-flex;align-items:center;justify-content:center;
+  width:30px;height:30px;border-radius:8px;background:var(--accent);color:#fff;
+  font-size:15px;flex:none}
+.lead{color:var(--text-sub);font-size:14px;margin-bottom:16px}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:var(--shadow);padding:20px 22px;margin-bottom:14px}
+.card h3{font-size:16px;font-weight:650;margin-bottom:10px;color:var(--text)}
+
+/* callout */
+.callout{border-left:4px solid var(--accent);background:var(--accent-soft);
+  padding:12px 16px;border-radius:0 8px 8px 0;margin:12px 0;font-size:14px}
+.callout.red{border-color:var(--red);background:var(--red-soft)}
+.callout.green{border-color:var(--green);background:var(--green-soft)}
+.callout.amber{border-color:var(--amber);background:var(--amber-soft)}
+.callout.purple{border-color:var(--purple);background:var(--purple-soft)}
+.callout b{font-weight:650}
+
+/* table */
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:12px 0;border:1px solid var(--border);border-radius:9px}
+table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:480px}
+th{background:var(--surface-alt);font-weight:650;text-align:left;padding:10px 13px;
+  border-bottom:2px solid var(--border);color:var(--text-sub);white-space:nowrap}
+td{padding:10px 13px;border-bottom:1px solid var(--border)}
+tr:last-child td{border-bottom:none}
+tbody tr:hover{background:var(--surface-alt)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+
+/* formula */
+.formula{background:#1f2430;color:#e8ecf4;padding:14px 16px;border-radius:9px;
+  font-family:"SF Mono",Consolas,"Liberation Mono",monospace;font-size:13px;
+  line-height:1.9;overflow-x:auto;white-space:pre;margin:12px 0}
+.formula .k{color:#7dd3fc}.formula .v{color:#fbbf24}.formula .c{color:#94a3b8}
+
+/* grid */
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;margin:12px 0}
+.mini{background:var(--surface-alt);border-radius:9px;padding:14px 16px;border:1px solid var(--border)}
+.mini .t{font-weight:650;font-size:14px;margin-bottom:6px}
+.mini .d{font-size:13px;color:var(--text-sub)}
+.mini .v{font-size:22px;font-weight:700;color:var(--accent);margin:4px 0}
+
+/* badge */
+.badge{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:6px;
+  vertical-align:middle;margin-left:6px}
+.badge.r{background:var(--red-soft);color:var(--red)}
+.badge.g{background:var(--green-soft);color:var(--green)}
+.badge.a{background:var(--amber-soft);color:var(--amber)}
+
+ul,ol{padding-left:22px;margin:8px 0}
+li{margin:5px 0}
+code{background:var(--surface-alt);padding:1px 6px;border-radius:5px;
+  font-family:Consolas,monospace;font-size:.9em;color:var(--purple)}
+
+/* steps */
+.step{display:flex;gap:12px;margin:10px 0;align-items:flex-start}
+.step .n{flex:none;width:26px;height:26px;border-radius:50%;background:var(--accent);
+  color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600}
+.step .c{font-size:14px}
+
+footer{text-align:center;color:var(--text-mute);font-size:12px;margin-top:40px;
+  padding-top:20px;border-top:1px solid var(--border)}
+
+@media(max-width:600px){
+  header{padding:32px 0 28px}
+  header h1{font-size:23px}
+  .card{padding:16px}
+  h2{font-size:18px}
+  body{font-size:14px}
+  .formula{font-size:11.5px;padding:11px}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <h1>导弹机制深度解析</h1>
+    <div class="sub">SimplePlanes 2 · 基于 Game.dll 反编译实证 · 2026-11-25</div>
+    <div class="tags">
+      <span class="tag">主动雷达 / 红外</span>
+      <span class="tag">脱锁判定</span>
+      <span class="tag">干扰弹叠加</span>
+      <span class="tag">转弯性能</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<nav>
+  <a href="#s1">1 · 脱锁逻辑</a>
+  <a href="#s2">2 · 概率叠加</a>
+  <a href="#s3">3 · 四发齐射</a>
+  <a href="#s4">4 · 持续锁定</a>
+  <a href="#s5">5 · 转弯 G 与速率</a>
+  <a href="#s6">6 · 如何提升</a>
+</nav>
+
+<!-- SECTION 1 -->
+<section id="s1">
+  <h2><span class="num">1</span>脱锁逻辑总览</h2>
+  <p class="lead">主动雷达弹与红外弹<strong>共用同一套脱锁机制</strong>，差别只在锁之前的签名、灵敏度与射程。</p>
+
+  <div class="card">
+    <h3>关键结论</h3>
+    <div class="callout green">
+      <b>两者在“脱锁”层面完全相同。</b> 都走 <code>MissileSeeker.AcquireTarget / MaintainLock</code>；<code>IRSeeker</code> 与 <code>RadarSeeker</code> 只提供 signature 类型、灵敏度、发射提示语三件事。
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>项目</th><th>红外弹</th><th>主动雷达弹</th></tr></thead>
+        <tbody>
+          <tr><td>SignatureType</td><td>1 = IR</td><td>2 = Radar</td></tr>
+          <tr><td>导引头灵敏度</td><td class="num">5</td><td class="num">25</td></tr>
+          <tr><td>最大锁定距离</td><td class="num">16.1 km</td><td class="num">48.3 km</td></tr>
+          <tr><td>FOV 范围</td><td>15°–60°</td><td>5°–25°</td></tr>
+          <tr><td>制导样式</td><td>StandardLock</td><td>StandardLock</td></tr>
+          <tr><td>发射提示</td><td>Fox Two</td><td>Fox Three</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>锁前：获取锁定</h3>
+    <div class="formula"><span class="k">rate</span> = clamp( signature / distance × sensitivity, 0, 2 )
+<span class="k">rate</span> = max( rate, <span class="v">0.1</span> )          <span class="c">// 强制下限</span>
+<span class="c">// ContinuousLock 再 ×1.5 — 红外/主动雷达均不适用</span>
+lockPercentage += rate × dt</div>
+    <ul>
+      <li>条件：非友军、夹角 ≤ 最大制导角、距离在射程内、未被遮挡、非和平模式、冷却结束。</li>
+      <li>锁定进度的增长只由上式决定；灵敏度越高、距离越近、签名越强，锁得越快。</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>锁后：维持与脱锁</h3>
+    <p>每个物理帧调用 <code>MaintainLock</code>，只有三种方式结束锁定：</p>
+    <div class="step"><div class="n">1</div><div class="c"><strong>目标死亡</strong> → 清空目标，返回 false</div></div>
+    <div class="step"><div class="n">2</div><div class="c"><strong>干扰概率上升沿判定成功</strong> → 脱锁（下文详述）</div></div>
+    <div class="step"><div class="n">3</div><div class="c"><strong>ContinuousLock 且目标失锁</strong> → 仅半主动弹适用，红外/主动雷达不走这条</div></div>
+    <div class="callout red">
+      <b>锁后不再检查</b>夹角、距离、遮挡、冷却、锁定进度衰减。目标飞出视场或被地形挡住，导弹照样锁定。
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 2 -->
+<section id="s2">
+  <h2><span class="num">2</span>脱锁概率是否逐步叠加</h2>
+  <p class="lead">分两层看：<strong>目标侧是叠加的</strong>，<strong>导引头侧是上升沿判定</strong>，不是逐帧累加。</p>
+
+  <div class="card">
+    <h3>目标侧：递减叠加 + 衰减</h3>
+    <div class="formula"><span class="k">newBreak</span> = clamp( current + added, 0, <span class="v">0.9</span> )
+<span class="k">added</span>    = breakChance × ( 1 − current ) × EvadeCurve( signature )</div>
+    <ul>
+      <li>每发都乘 <code>(1 − current)</code>，所以是<strong>递减叠加</strong>，不是线性。</li>
+      <li>上限钳在 <strong>0.9</strong>（不是 1.0）。</li>
+      <li>每发贡献按 <strong>0.25/s</strong> 消散；默认 breakChance = 0.25、evadeLockChance = 0.5。</li>
+      <li>干扰弹<strong>不注册为独立目标</strong>，只改 PlayerTarget 的概率字典。</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>导引头侧：上升沿触发</h3>
+    <div class="formula"><span class="k">if</span> ( breakProb &gt; lastBreakLockChance &amp;&amp; IsLocked )
+    lock = 1 − breakProb
+    roll = Random.Range( 0.1, 1.0 )
+    <span class="k">if</span> ( lock &lt; roll ) → 清除目标，脱锁
+lastBreakLockChance = breakProb       <span class="c">// 只赋值，不衰减</span></div>
+    <div class="callout amber">
+      <b>瞬时脱锁率 = p / 0.9。</b> 概率不上升就不掷骰子；快照成为“历史峰值”，扛过一次后对同等干扰免疫。代码里衰减的是 <code>_lastTargetBreakChance</code>，而比较用的是 <code>_lastBreakLockChance</code>——后者无衰减路径。
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 3 -->
+<section id="s3">
+  <h2><span class="num">3</span>单次同时发射四发</h2>
+  <p class="lead">齐射把概率一次性堆高，但导弹<strong>只做一次判定</strong>；分开发射则每次上升沿都能重新掷骰子。</p>
+
+  <div class="card">
+    <h3>齐射计算（默认参数，曲线系数 m = 1）</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>第几发</th><th class="num">增量</th><th class="num">累计概率</th><th class="num">单次脱锁率</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td class="num">0.250</td><td class="num">0.250</td><td class="num">27.8%</td></tr>
+          <tr><td>2</td><td class="num">0.188</td><td class="num">0.438</td><td class="num">48.6%</td></tr>
+          <tr><td>3</td><td class="num">0.141</td><td class="num">0.578</td><td class="num">64.2%</td></tr>
+          <tr><td>4</td><td class="num">0.106</td><td class="num"><strong>0.684</strong></td><td class="num"><strong>76.0%</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="formula">p = min( 0.9, 1 − (1 − 0.25·m)<sup>4</sup> )      脱锁率 = p / 0.9</div>
+  </div>
+
+  <div class="grid">
+    <div class="mini">
+      <div class="t">四发齐射</div>
+      <div class="v">76.0%</div>
+      <div class="d">1 次判定 · 总衰减率 1.0/s · 约 0.68 秒归零</div>
+    </div>
+    <div class="mini">
+      <div class="t">分四帧发射</div>
+      <div class="v">96.8%</div>
+      <div class="d">4 次判定 · 持续更久 · 更可靠</div>
+    </div>
+  </div>
+
+  <div class="callout green">
+    <b>结论：</b>想立刻甩掉锁定，分开发射比齐射更可靠。齐射的优势是瞬时概率高，但只给一次机会且衰减快。扛过齐射后快照记为 0.684，恰好再投四发只会相等、不触发新判定，需要第五发才能重掷。
+  </div>
+</section>
+
+<!-- SECTION 4 -->
+<section id="s4">
+  <h2><span class="num">4</span>导弹能否一直锁定</h2>
+  <p class="lead">可以。发射后不存在超时、无距离/视角/遮挡复核，只要不触发那次随机脱锁判定，锁定会一直保持。</p>
+
+  <div class="card">
+    <h3>不会导致脱锁的情况</h3>
+    <ul>
+      <li>目标大幅机动、飞出导引头视场、被地形遮挡、飞出原射程 —— 均不复核。</li>
+      <li>燃料耗尽：<code>OnFuelExhausted</code> 只置 <code>OutOfFuel</code>，不清目标、不置 <code>IsLocked=false</code>。</li>
+      <li>干扰概率保持不变或下降：不构成上升沿，不掷骰子。</li>
+    </ul>
+    <div class="callout purple">
+      <b>高水位效应：</b>快照 <code>_lastBreakLockChance</code> 没有衰减路径，只有赋值。扛过一次干扰后，后续概率必须<strong>超过历史峰值</strong>才会再次判定。真正能“扛过去并长期免疫”的窗口在 0.85–0.89 附近（0.9 时几乎必脱锁）。
+    </div>
+    <div class="callout red">
+      <b>唯一常态终点：</b>命中、目标被摧毁，或物理上失效。红外/主动雷达发射后即“发射后不管”，不会重新搜索目标。
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 5 -->
+<section id="s5">
+  <h2><span class="num">5</span>转弯 G 力 vs 转弯速率</h2>
+  <p class="lead">面板上是两个独立显示、量纲不同的数值：一个是姿态转速（deg/s），一个是轨迹过载（Gs）。</p>
+
+  <div class="card">
+    <h3>游戏内显示对照</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>显示项</th><th>单位</th><th>游戏内计算式</th><th>决定因素</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>转弯速率</strong></td><td>deg/s</td>
+            <td><code>MaxHeadingAngleAdjustmentRate + MaxThrustVectoringRate</code></td>
+            <td>尾翼/舵面 + 推力矢量</td>
+          </tr>
+          <tr>
+            <td><strong>转弯 G 力</strong></td><td>Gs</td>
+            <td><code>MaxVelocityAngleAdjustmentRate × π/180 × MaxSpeed / 9.81</code></td>
+            <td>尾翼升力/质量 <strong>× 最大速度</strong></td>
+          </tr>
+          <tr>
+            <td>直线加速（易混淆）</td><td>Gs</td>
+            <td><code>Acceleration / 9.81</code></td>
+            <td>不是转弯</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>物理含义</h3>
+    <div class="grid">
+      <div class="mini">
+        <div class="t">转弯速率 · 姿态</div>
+        <div class="d">机头指向目标的角速度，决定导引/瞄准响应速度。主要由尾翼面积与力臂决定，低速时还会被 <code>speed/maxSpeed</code> 打折。</div>
+      </div>
+      <div class="mini">
+        <div class="t">转弯 G 力 · 轨迹</div>
+        <div class="d">飞行方向弯折对应的向心加速度，决定拦截高机动目标时轨迹能否咬住。物理关系 <code>a = ω·v</code>，所以速度越大 G 越高。</div>
+      </div>
+    </div>
+    <div class="callout amber">
+      <b>关键权衡：</b><code>MaxSpeed = 引擎MaxSpeed × clamp(1 − 0.2k, 0.25, 1)</code>。尾翼越极端，k 越大反而把速度压得越低（最多 −20%）。高速弹应适度控制尾翼、优先保速度；低速弹才靠大尾翼换 k。
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 6 -->
+<section id="s6">
+  <h2><span class="num">6</span>如何分别提升</h2>
+  <p class="lead">两者共享核心因子 <code>k = clamp(尾翼效率 ÷ 质量, 0.05, 2.0)</code>，但侧重不同。</p>
+
+  <div class="card">
+    <h3>提升转弯速率（deg/s）</h3>
+    <ul>
+      <li><strong>增大尾翼面积</strong> — 提高 Σ面积，两者同涨。</li>
+      <li><strong>尾翼后移</strong> — 加大 z 力臂，同时抬高力臂系数，对 deg/s 增益最大。</li>
+      <li><strong>增加尾翼数量 / 弦长</strong> — 面积与力臂双升，但增重。</li>
+      <li><strong>减重</strong>（缩小战斗部、减轻引擎）— 两者同涨。</li>
+      <li><strong>矢量推进引擎</strong> — 只加姿态转速，不加 G 力。</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>提升转弯 G 力（Gs）</h3>
+    <ul>
+      <li><strong>提高 MaxSpeed</strong> — 最直接，G 与速度成正比，且不影响 deg/s。</li>
+      <li><strong>增大尾翼面积 / 后移尾翼</strong> — 提高 k，但受速度惩罚约束。</li>
+      <li><strong>减重</strong> — 提高 k，无副作用。</li>
+    </ul>
+    <div class="callout green">
+      <b>最简操作建议：</b>想让弹头快速指向目标 → 尾翼做大、往尾部装，可加矢量推进。想让轨迹急转咬住机动目标 → 优先提高引擎最大速度。两者兼顾 → 减重是唯一同时利好且无副作用的手段。
+    </div>
+  </div>
+</section>
+
+<footer>
+  基于 Game.dll IL 反编译实证 · 本报告仅作游戏机制分析，未修改任何游戏文件<br>
+  生成于 2026-11-25 · SimplePlanes 2 载具魔改项目
+</footer>
+
+</div>
+</body>
+</html>

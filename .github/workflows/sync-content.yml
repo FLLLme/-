@@ -31,6 +31,7 @@ on:
       - 'content/posts/**'
       - 'content/works/**'
       - 'content/friends/**'
+      - 'content/sandbox/**'
   workflow_dispatch:        # 允许在 Actions 页面手动运行
 
 permissions:

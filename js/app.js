@@ -170,6 +170,8 @@
       (CFG.works || []).length || CFG.workPlaceholders > 0
         ? { key: 'works',   label: '作品集', href: 'index.html#worksSection' } : null,
       { key: 'posts', label: '文章', href: 'index.html#latest' },
+      /* 沙盒子站是独立页面（不在首页锚点里），单独给它一个 key 用于选中态 */
+      { key: 'sandbox', label: '沙盒造物笔记', href: 'sandbox/index.html' },
       (CFG.friends || []).length
         ? { key: 'friends', label: '友链',   href: 'index.html#friendsSection' } : null,
       { key: 'about', label: '关于', href: 'index.html#about' }

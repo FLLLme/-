@@ -260,3 +260,51 @@ collections:
         value_type: int
         hint: 数字越小越靠前，留空按网名排序
 
+  # ---------------------------------------------------------------------------
+  # 沙盒造物笔记（HTML 文档）
+  #
+  # 与其它集合的关键差别：这里的「条目」是一条**索引记录**，不是文档本身。
+  # HTML 原样放进 sandbox/notes/（媒体库），记录里只保存它的路径。
+  #
+  # 为什么不把 HTML 当成条目文件：
+  #   Decap 的条目文件需要 front matter（用 --- 包起来的头部），而带 front matter
+  #   的 HTML 被浏览器直接打开时，那几行会被当作正文显示出来，破坏排版。
+  #   所以文件与记录分开：文件保持可直接打开的原样，记录只负责索引。
+  #
+  # 列表页显示的名字由 tools/sync_extras.py 从文件名推导，不需要另填标题。
+  # ---------------------------------------------------------------------------
+  - name: sandbox
+    label: 沙盒造物笔记
+    label_singular: 笔记
+    description: '首页导航「沙盒造物笔记」子站点里的 HTML 文档'
+
+    folder: content/sandbox
+    create: true
+    delete: true
+
+    # 上传的 HTML 放进独立目录，不混在图片媒体库里
+    media_folder: 'sandbox/notes'
+    public_folder: '/sandbox/notes'
+
+    identifier_field: file
+    slug: '{{slug}}'
+
+    extension: json
+    format: json
+
+    summary: '{{fields.file}}'
+    sortable_fields: ['order', 'commit_date']
+
+    fields:
+      - label: HTML 文件
+        name: file
+        widget: file
+        hint: '上传 .html 文件。列表与页面上显示的就是这个文件名（去掉扩展名）'
+
+      - label: 排序权重
+        name: order
+        widget: number
+        required: false
+        value_type: int
+        hint: 数字越小越靠前，留空按文件名排
+

@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SimplePlanes 2 · 涵道比与最佳飞行高度结论</title>
+<style>
+:root{
+  --bg:#f5f6f8; --surface:#ffffff; --surface-alt:#f0f2f5;
+  --text:#1f2329; --text-sub:#555e6b; --text-mute:#8a929c;
+  --border:#e2e5ea; --accent:#2563eb; --accent-soft:#eaf1ff;
+  --red:#c0392b; --red-soft:#fdecea; --green:#1e7a52; --green-soft:#e7f5ee;
+  --amber:#9a6700; --amber-soft:#fdf3dc; --purple:#6d3fb5; --purple-soft:#f1eafa;
+  --radius:12px; --shadow:0 1px 3px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.04);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  background:var(--bg); color:var(--text); line-height:1.75; font-size:15px;
+  -webkit-font-smoothing:antialiased; padding-bottom:60px;
+}
+.wrap{max-width:920px;margin:0 auto;padding:0 20px}
+
+header{
+  background:linear-gradient(135deg,#7c3aed,#2563eb); color:#fff;
+  padding:46px 0 40px; margin-bottom:32px;
+}
+header .wrap{display:flex;flex-direction:column;gap:8px}
+header h1{font-size:30px;font-weight:700;letter-spacing:.5px;line-height:1.3}
+header .sub{font-size:14px;opacity:.85;font-weight:400}
+header .tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+header .tag{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.25);
+  padding:4px 11px;border-radius:20px;font-size:12px}
+
+nav{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:var(--shadow);padding:14px 18px;margin-bottom:28px;
+  display:flex;flex-wrap:wrap;gap:8px}
+nav a{color:var(--accent);text-decoration:none;font-size:13px;padding:5px 11px;
+  border-radius:7px;background:var(--accent-soft);transition:.15s}
+nav a:hover{background:var(--accent);color:#fff}
+
+section{margin-bottom:34px;scroll-margin-top:16px}
+h2{font-size:21px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:10px}
+h2 .num{display:inline-flex;align-items:center;justify-content:center;
+  width:30px;height:30px;border-radius:8px;background:var(--accent);color:#fff;
+  font-size:15px;flex:none}
+.lead{color:var(--text-sub);font-size:14px;margin-bottom:16px}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:var(--shadow);padding:20px 22px;margin-bottom:14px}
+.card h3{font-size:16px;font-weight:650;margin-bottom:10px;color:var(--text)}
+
+.callout{border-left:4px solid var(--accent);background:var(--accent-soft);
+  padding:12px 16px;border-radius:0 8px 8px 0;margin:12px 0;font-size:14px}
+.callout.red{border-color:var(--red);background:var(--red-soft)}
+.callout.green{border-color:var(--green);background:var(--green-soft)}
+.callout.amber{border-color:var(--amber);background:var(--amber-soft)}
+.callout.purple{border-color:var(--purple);background:var(--purple-soft)}
+.callout b{font-weight:650}
+
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:12px 0;border:1px solid var(--border);border-radius:9px}
+table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:460px}
+th{background:var(--surface-alt);font-weight:650;text-align:left;padding:10px 13px;
+  border-bottom:2px solid var(--border);color:var(--text-sub);white-space:nowrap}
+td{padding:10px 13px;border-bottom:1px solid var(--border)}
+tr:last-child td{border-bottom:none}
+tbody tr:hover{background:var(--surface-alt)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+
+.formula{background:#1f2430;color:#e8ecf4;padding:16px 18px;border-radius:9px;
+  font-family:"SF Mono",Consolas,"Liberation Mono",monospace;font-size:14px;
+  line-height:2;overflow-x:auto;white-space:pre;margin:12px 0;text-align:center}
+.formula .k{color:#7dd3fc}.formula .v{color:#fbbf24}.formula .c{color:#94a3b8}
+
+.hero{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin:14px 0}
+.hero .box{background:linear-gradient(135deg,var(--accent-soft),#f7faff);
+  border:1px solid #cfe0ff;border-radius:11px;padding:16px}
+.hero .box .lab{font-size:12px;color:var(--text-sub);margin-bottom:4px}
+.hero .box .val{font-size:25px;font-weight:750;color:var(--accent);line-height:1.2}
+.hero .box .unit{font-size:13px;color:var(--text-mute);font-weight:400}
+
+ul,ol{padding-left:22px;margin:8px 0}
+li{margin:5px 0}
+code{background:var(--surface-alt);padding:1px 6px;border-radius:5px;
+  font-family:Consolas,monospace;font-size:.9em;color:var(--purple)}
+
+.bar{height:26px;background:var(--surface-alt);border-radius:5px;position:relative;overflow:hidden;min-width:160px}
+.bar .fill{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,#60a5fa,#2563eb);border-radius:5px}
+.bar .txt{position:relative;z-index:1;font-size:11px;color:#fff;padding-left:7px;line-height:26px;font-weight:600}
+
+footer{text-align:center;color:var(--text-mute);font-size:12px;margin-top:40px;
+  padding-top:20px;border-top:1px solid var(--border)}
+
+@media(max-width:600px){
+  header{padding:32px 0 28px}
+  header h1{font-size:23px}
+  .card{padding:16px}
+  h2{font-size:18px}
+  body{font-size:14px}
+  .formula{font-size:12px;padding:12px}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <h1>涵道比与最佳飞行高度 · 结论</h1>
+    <div class="sub">SimplePlanes 2 · 基于 JetEngineMath 反编译与数值拟合 · 2026-11-27</div>
+    <div class="tags">
+      <span class="tag">实用升限判据</span>
+      <span class="tag">可直接代入的公式</span>
+      <span class="tag">涵道比速查表</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<nav>
+  <a href="#s1">1 · 核心结论</a>
+  <a href="#s2">2 · 关系机制</a>
+  <a href="#s3">3 · 公式</a>
+  <a href="#s4">4 · 速查与反推</a>
+  <a href="#s5">5 · 使用边界</a>
+</nav>
+
+<!-- SECTION 1 -->
+<section id="s1">
+  <h2><span class="num">1</span>核心结论</h2>
+  <div class="callout red">
+    <b>纯发动机模型里不存在"最佳高度"。</b> 推力随高度单调下降、SFC 单调上升、推进效率也单调下降——三者都没有内禀极值点。
+  </div>
+  <div class="callout green">
+    <b>唯一有物理意义的定义是"实用升限"</b>：可用推力恰好等于飞机巡航阻力时的高度。在这个定义下，涵道比与高度存在明确、可拟合的关系。
+  </div>
+  <div class="callout amber">
+    <b>涵道比越大，最佳高度越低。</b> 涵道比不改变高度衰减比例，只改变海平面推力绝对值，从而改变升限。
+  </div>
+</section>
+
+<!-- SECTION 2 -->
+<section id="s2">
+  <h2><span class="num">2</span>关系机制</h2>
+  <p class="lead">高度衰减与涵道比基本无关，且约等于大气密度比。</p>
+
+  <div class="card">
+    <h3>归一化推力衰减（相对海平面）</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>高度</th><th class="num">BPR 0.2</th><th class="num">BPR 0.8</th><th class="num">BPR 2.0</th><th class="num">大气密度比</th></tr></thead>
+        <tbody>
+          <tr><td>0 km</td><td class="num">1.000</td><td class="num">1.000</td><td class="num">1.000</td><td class="num">1.000</td></tr>
+          <tr><td>6 km</td><td class="num">0.552</td><td class="num">0.548</td><td class="num">0.543</td><td class="num">0.539</td></tr>
+          <tr><td>10 km</td><td class="num">0.344</td><td class="num">0.340</td><td class="num">0.335</td><td class="num">0.339</td></tr>
+          <tr><td>14 km</td><td class="num">0.189</td><td class="num">0.186</td><td class="num">0.183</td><td class="num">0.198</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>涵道比的真实作用</h3>
+    <p>固定 <code>size=1.25 / CPR=24 / T4=1800K / M=0.8</code>，海平面推力：</p>
+    <div class="grid">
+      <div class="mini"><div class="t">BPR 0.2</div><div class="v">135.6 kN</div><div class="d">低涵道，推力大</div></div>
+      <div class="mini"><div class="t">BPR 0.8</div><div class="v">96.7 kN</div><div class="d">均衡</div></div>
+      <div class="mini"><div class="t">BPR 2.0</div><div class="v">65.4 kN</div><div class="d">高涵道，推力小</div></div>
+    </div>
+    <div class="formula">涵道比↑ → 核心进气面积↓、喷速↓ → 海平面推力↓
+        → 同阻力下更早达到"推力=阻力" → 升限↓</div>
+  </div>
+</section>
+
+<!-- SECTION 3 -->
+<section id="s3">
+  <h2><span class="num">3</span>可直接使用的公式</h2>
+
+  <div class="card">
+    <h3>完整公式（144 组样本回归，平均误差 0.30 km）</h3>
+    <div class="formula"><span class="k">h(km)</span> = 32.097 − 7.539·ln(<span class="v">D</span>) − 6.292·ln(1+<span class="v">BPR</span>)
+           + 18.180·ln(<span class="v">size</span>) + 4.550·<span class="v">M</span></div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>符号</th><th>含义</th><th>单位</th></tr></thead>
+        <tbody>
+          <tr><td><code>D</code></td><td>巡航阻力需求</td><td>kN</td></tr>
+          <tr><td><code>BPR</code></td><td>涵道比</td><td>—</td></tr>
+          <tr><td><code>size</code></td><td>引擎尺寸倍率</td><td>—</td></tr>
+          <tr><td><code>M</code></td><td>巡航马赫数</td><td>—</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size:13.5px;color:var(--text-sub)">压缩比与燃烧室温度影响小于 0.3 km，可忽略。</p>
+  </div>
+
+  <div class="card">
+    <h3>简化版 —— 直接代入涵道比</h3>
+    <p>条件：<code>D=30kN / size=1.25 / M=0.8</code></p>
+    <div class="formula"><span class="k">h(km)</span> = 14.187 − 6.061·ln(1+<span class="v">BPR</span>)</div>
+    <div class="callout green">
+      <b>反函数</b>（已知目标高度求涵道比）：<code>BPR = exp((C − h)/6.292) − 1</code>，其中 C 由 D、size、M 决定。
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>推荐发动机实测</h3>
+    <p>BPR=0.7 / size=1.25：</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>巡航阻力 D</th><th class="num">公式值</th><th class="num">实测值</th></tr></thead>
+        <tbody>
+          <tr><td>20 kN</td><td class="num">13.99 km</td><td class="num">13.65 km</td></tr>
+          <tr><td>30 kN</td><td class="num">10.86 km</td><td class="num">11.08 km</td></tr>
+          <tr><td>40 kN</td><td class="num">8.63 km</td><td class="num">8.82 km</td></tr>
+          <tr><td>50 kN</td><td class="num">6.91 km</td><td class="num">6.94 km</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 4 -->
+<section id="s4">
+  <h2><span class="num">4</span>速查与反推</h2>
+
+  <div class="card">
+    <h3>涵道比 → 最佳高度（D=30kN, size=1.25, M=0.8）</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>BPR</th><th class="num">最佳高度</th><th>相对刻度</th></tr></thead>
+        <tbody>
+          <tr><td>0.20</td><td class="num">13.2 km</td><td><div class="bar"><div class="fill" style="width:100%"></div><div class="txt">低涵道 · 高空</div></div></td></tr>
+          <tr><td>0.40</td><td class="num">12.1 km</td><td><div class="bar"><div class="fill" style="width:92%"></div><div class="txt"></div></div></td></tr>
+          <tr><td>0.70</td><td class="num">10.9 km</td><td><div class="bar"><div class="fill" style="width:83%"></div><div class="txt"></div></div></td></tr>
+          <tr><td>1.00</td><td class="num">9.8 km</td><td><div class="bar"><div class="fill" style="width:74%"></div><div class="txt"></div></div></td></tr>
+          <tr><td>1.50</td><td class="num">8.3 km</td><td><div class="bar"><div class="fill" style="width:63%"></div><div class="txt"></div></div></td></tr>
+          <tr><td>2.00</td><td class="num">7.1 km</td><td><div class="bar"><div class="fill" style="width:54%"></div><div class="txt">高涵道 · 低空</div></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>反推：目标高度 → 需要的涵道比（D=30kN）</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>目标高度</th><th class="num">所需 BPR</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>8 km</td><td class="num">1.62</td><td>高涵道，低空经济</td></tr>
+          <tr><td>10 km</td><td class="num">0.94</td><td>均衡点</td></tr>
+          <tr><td>12 km</td><td class="num">0.43</td><td>低涵道，高空截击</td></tr>
+          <tr><td>14 km</td><td class="num">0.06</td><td>接近纯核心流</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout amber">
+      <b>注意：</b>超过约 14 km 后，即使涵道比降到 0 也无法维持——此时需要增大 <code>size</code> 或降低阻力 <code>D</code>。
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 5 -->
+<section id="s5">
+  <h2><span class="num">5</span>使用边界</h2>
+  <div class="card">
+    <ul>
+      <li>公式的"最佳高度"是<strong>升限定义</strong>，回答"这发动机能把飞机托到多高"。</li>
+      <li>若判据改为 SFC 最低或航程最优，结论不同——SFC 最低点始终在低空低速，不存在高度最优点。</li>
+      <li>有效范围：<code>BPR 0.2–2.0 / D 20–60kN / size 1.0–1.5 / M 0.6–1.2</code>，超出需重新拟合。</li>
+      <li>公式基于推荐发动机参数（CPR=24、T4=1800K）标定；压缩比 5–30、温度 1600–2250K 范围内误差仍小于 0.3 km。</li>
+    </ul>
+    <div class="callout purple">
+      <b>一句话总结：</b>涵道比每提高 1.0，实用升限约下降 3–4 km；想要飞得更高就降低涵道比，想要低空省油就提高涵道比。
+    </div>
+  </div>
+</section>
+
+<footer>
+  基于 JetEngineMath 反编译与 144 组数值样本回归 · 本报告仅作游戏机制分析，未修改任何游戏文件<br>
+  生成于 2026-11-27 · SimplePlanes 2 载具魔改项目
+</footer>
+
+</div>
+</body>
+</html>

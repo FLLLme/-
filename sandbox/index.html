@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>沙盒造物笔记 · 未见花</title>
+<meta name="description" content="SimplePlanes 2 的反编译与数值拟合笔记">
+<style>
+/* 视觉上刻意沿用这三份文档自己的设计体系（冷灰底 + 蓝主色 + 紫蓝渐变头图），
+   而不是主站的暖白朱砂 —— 「沙盒造物笔记」是一个独立的子站点，
+   落地页与文档保持一致才是一体的，从主站跳进来才有"进入另一个空间"的感觉。 */
+:root{
+  --bg:#f5f6f8; --surface:#ffffff; --surface-alt:#f0f2f5;
+  --text:#1f2329; --text-sub:#555e6b; --text-mute:#8a929c;
+  --border:#e2e5ea; --accent:#2563eb; --accent-soft:#eaf1ff;
+  --radius:12px; --shadow:0 1px 3px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.04);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  background:var(--bg); color:var(--text); line-height:1.75; font-size:15px;
+  -webkit-font-smoothing:antialiased; padding-bottom:60px;
+}
+.wrap{max-width:920px;margin:0 auto;padding:0 20px}
+
+header{
+  background:linear-gradient(135deg,#7c3aed,#2563eb); color:#fff;
+  padding:46px 0 40px; margin-bottom:28px;
+}
+header .wrap{display:flex;flex-direction:column;gap:8px}
+header h1{font-size:30px;font-weight:700;letter-spacing:.5px;line-height:1.3}
+header .sub{font-size:14px;opacity:.85;font-weight:400}
+header .tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+header .tag{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.25);
+  padding:4px 11px;border-radius:20px;font-size:12px}
+
+/* 返回主站：与文档里的章节药丸同一套样式，放在最前面 */
+.back{display:inline-flex;align-items:center;gap:6px;margin-bottom:20px;
+  color:var(--accent);text-decoration:none;font-size:13px;padding:6px 13px;
+  border-radius:8px;background:var(--accent-soft);transition:.15s}
+.back:hover{background:var(--accent);color:#fff}
+
+.intro{color:var(--text-sub);font-size:14px;margin-bottom:20px}
+
+/* 笔记列表 */
+.notes{list-style:none;display:flex;flex-direction:column;gap:12px}
+.note{display:block;text-decoration:none;color:inherit;background:var(--surface);
+  border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);
+  padding:18px 22px;transition:transform .15s,box-shadow .15s,border-color .15s;
+  position:relative;overflow:hidden}
+.note::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
+  background:var(--accent);transform:scaleY(0);transform-origin:top;transition:transform .2s}
+.note:hover{transform:translateY(-2px);border-color:#cfe0ff;
+  box-shadow:0 2px 6px rgba(0,0,0,.07),0 10px 26px rgba(37,99,235,.10)}
+.note:hover::before{transform:scaleY(1)}
+.note .t{font-size:16px;font-weight:650;line-height:1.5;color:var(--text)}
+.note .meta{display:flex;align-items:center;gap:8px;margin-top:6px;
+  font-size:12px;color:var(--text-mute)}
+.note .kind{background:var(--surface-alt);border:1px solid var(--border);
+  padding:1px 7px;border-radius:5px;font-size:11px}
+.note .arrow{margin-left:auto;color:var(--accent);font-size:15px;opacity:0;transition:opacity .2s}
+.note:hover .arrow{opacity:1}
+
+/* 状态：加载中 / 空 / 失败 */
+.state{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:var(--shadow);padding:28px 24px;text-align:center;color:var(--text-mute);font-size:14px}
+.state b{display:block;color:var(--text-sub);font-size:15px;margin-bottom:4px}
+
+footer{text-align:center;color:var(--text-mute);font-size:12px;margin-top:40px;
+  padding-top:20px;border-top:1px solid var(--border)}
+footer a{color:var(--text-sub);text-decoration:none;border-bottom:1px solid var(--border)}
+
+@media(max-width:600px){
+  header{padding:32px 0 28px}
+  header h1{font-size:23px}
+  .note{padding:15px 17px}
+  .note .t{font-size:15px}
+  body{font-size:14px}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <h1>沙盒造物笔记</h1>
+    <div class="sub">SimplePlanes 2 · 反编译实证与数值拟合</div>
+    <div class="tags">
+      <span class="tag">Game.dll 反编译</span>
+      <span class="tag">推进系统</span>
+      <span class="tag">气动与导弹</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <a class="back" href="../index.html">← 返回未见花</a>
+
+  <p class="intro" id="intro">下面是把游戏内机制拆开看过之后留下的笔记。</p>
+
+  <ul class="notes" id="notes" hidden></ul>
+  <div class="state" id="state">正在读取目录…</div>
+
+  <footer>
+    <p>笔记内容基于实测与反编译，随游戏版本可能失效。<a href="../index.html">回到主站</a></p>
+  </footer>
+</div>
+
+<script src="list.js"></script>
+</body>
+</html>

@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SimplePlanes 2 · 军用涡扇发动机深度解析</title>
+<style>
+:root{
+  --bg:#f5f6f8; --surface:#ffffff; --surface-alt:#f0f2f5;
+  --text:#1f2329; --text-sub:#555e6b; --text-mute:#8a929c;
+  --border:#e2e5ea; --accent:#2563eb; --accent-soft:#eaf1ff;
+  --red:#c0392b; --red-soft:#fdecea; --green:#1e7a52; --green-soft:#e7f5ee;
+  --amber:#9a6700; --amber-soft:#fdf3dc; --purple:#6d3fb5; --purple-soft:#f1eafa;
+  --radius:12px; --shadow:0 1px 3px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.04);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  background:var(--bg); color:var(--text); line-height:1.75; font-size:15px;
+  -webkit-font-smoothing:antialiased; padding-bottom:60px;
+}
+.wrap{max-width:920px;margin:0 auto;padding:0 20px}
+
+header{
+  background:linear-gradient(135deg,#0f766e,#2563eb); color:#fff;
+  padding:46px 0 40px; margin-bottom:32px;
+}
+header .wrap{display:flex;flex-direction:column;gap:8px}
+header h1{font-size:30px;font-weight:700;letter-spacing:.5px;line-height:1.3}
+header .sub{font-size:14px;opacity:.85;font-weight:400}
+header .tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+header .tag{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.25);
+  padding:4px 11px;border-radius:20px;font-size:12px}
+
+nav{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:var(--shadow);padding:14px 18px;margin-bottom:28px;
+  display:flex;flex-wrap:wrap;gap:8px}
+nav a{color:var(--accent);text-decoration:none;font-size:13px;padding:5px 11px;
+  border-radius:7px;background:var(--accent-soft);transition:.15s}
+nav a:hover{background:var(--accent);color:#fff}
+
+section{margin-bottom:34px;scroll-margin-top:16px}
+h2{font-size:21px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:10px}
+h2 .num{display:inline-flex;align-items:center;justify-content:center;
+  width:30px;height:30px;border-radius:8px;background:var(--accent);color:#fff;
+  font-size:15px;flex:none}
+.lead{color:var(--text-sub);font-size:14px;margin-bottom:16px}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:var(--shadow);padding:20px 22px;margin-bottom:14px}
+.card h3{font-size:16px;font-weight:650;margin-bottom:10px;color:var(--text)}
+
+.callout{border-left:4px solid var(--accent);background:var(--accent-soft);
+  padding:12px 16px;border-radius:0 8px 8px 0;margin:12px 0;font-size:14px}
+.callout.red{border-color:var(--red);background:var(--red-soft)}
+.callout.green{border-color:var(--green);background:var(--green-soft)}
+.callout.amber{border-color:var(--amber);background:var(--amber-soft)}
+.callout.purple{border-color:var(--purple);background:var(--purple-soft)}
+.callout b{font-weight:650}
+
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:12px 0;border:1px solid var(--border);border-radius:9px}
+table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:480px}
+th{background:var(--surface-alt);font-weight:650;text-align:left;padding:10px 13px;
+  border-bottom:2px solid var(--border);color:var(--text-sub);white-space:nowrap}
+td{padding:10px 13px;border-bottom:1px solid var(--border)}
+tr:last-child td{border-bottom:none}
+tbody tr:hover{background:var(--surface-alt)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+
+.formula{background:#1f2430;color:#e8ecf4;padding:14px 16px;border-radius:9px;
+  font-family:"SF Mono",Consolas,"Liberation Mono",monospace;font-size:12.8px;
+  line-height:1.9;overflow-x:auto;white-space:pre;margin:12px 0}
+.formula .k{color:#7dd3fc}.formula .v{color:#fbbf24}.formula .c{color:#94a3b8}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin:12px 0}
+.mini{background:var(--surface-alt);border-radius:9px;padding:14px 16px;border:1px solid var(--border)}
+.mini .t{font-weight:650;font-size:14px;margin-bottom:5px}
+.mini .d{font-size:13px;color:var(--text-sub)}
+.mini .v{font-size:21px;font-weight:700;color:var(--accent);margin:4px 0}
+
+.hero{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:14px 0}
+.hero .box{background:linear-gradient(135deg,var(--accent-soft),#f7faff);
+  border:1px solid #cfe0ff;border-radius:11px;padding:16px}
+.hero .box .lab{font-size:12px;color:var(--text-sub);margin-bottom:4px}
+.hero .box .val{font-size:26px;font-weight:750;color:var(--accent);line-height:1.2}
+.hero .box .unit{font-size:13px;color:var(--text-mute);font-weight:400}
+
+ul,ol{padding-left:22px;margin:8px 0}
+li{margin:5px 0}
+code{background:var(--surface-alt);padding:1px 6px;border-radius:5px;
+  font-family:Consolas,monospace;font-size:.9em;color:var(--purple)}
+
+.step{display:flex;gap:12px;margin:10px 0;align-items:flex-start}
+.step .n{flex:none;width:26px;height:26px;border-radius:50%;background:var(--accent);
+  color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600}
+.step .c{font-size:14px}
+
+footer{text-align:center;color:var(--text-mute);font-size:12px;margin-top:40px;
+  padding-top:20px;border-top:1px solid var(--border)}
+
+.xml{background:#1f2430;color:#e8ecf4;padding:13px 15px;border-radius:9px;
+  font-family:Consolas,monospace;font-size:11.5px;line-height:1.7;overflow-x:auto;
+  white-space:pre;margin:10px 0}
+
+@media(max-width:600px){
+  header{padding:32px 0 28px}
+  header h1{font-size:23px}
+  .card{padding:16px}
+  h2{font-size:18px}
+  body{font-size:14px}
+  .formula{font-size:11.3px;padding:11px}
+  .hero .box .val{font-size:22px}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <h1>军用涡扇发动机 · 深度解析</h1>
+    <div class="sub">SimplePlanes 2 · 基于 Game.dll 反编译实证 · 2026-11-25</div>
+    <div class="tags">
+      <span class="tag">JetEngineMath 热力循环</span>
+      <span class="tag">油门缩放规律</span>
+      <span class="tag">质量反推</span>
+      <span class="tag">均衡配比</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<nav>
+  <a href="#s1">1 · 架构与数据</a>
+  <a href="#s2">2 · 热力循环</a>
+  <a href="#s3">3 · 推力与油耗</a>
+  <a href="#s4">4 · 油门与响应</a>
+  <a href="#s5">5 · 质量公式与反推</a>
+  <a href="#s6">6 · 调校要点</a>
+  <a href="#s7">7 · 最终配比</a>
+</nav>
+
+<!-- SECTION 1 -->
+<section id="s1">
+  <h2><span class="num">1</span>部件架构与数据入口</h2>
+  <p class="lead">Military Jet Engine 对应 <code>partType="Engine-Jet-Military-1"</code>，中文名"军用喷气发动机"，走新版推进系统。</p>
+
+  <div class="card">
+    <h3>核心结论</h3>
+    <div class="callout green">
+      <b>存档只保存参数，不保存推力和油耗。</b> 游戏每次按"满油门"求解热力学循环，再把推力/油耗按 <code>coreThrottle^2.5</code> 缩放。因此<strong>油门不改变 TSFC</strong>。
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>类型</th><th>职责</th></tr></thead>
+        <tbody>
+          <tr><td><code>JetEngineData</code></td><td>参数容器 + 设计器显示 + 质量计算</td></tr>
+          <tr><td><code>JetEngineMath</code></td><td>简化涡扇热力学循环求解（站位 0–8）</td></tr>
+          <tr><td><code>JetEngineScript</code></td><td>飞行中油门缩放、推力/油耗注入、IR 签名</td></tr>
+          <tr><td><code>EngineCommon</code></td><td>油门平滑、喷口更新、燃油消耗</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size:13.5px;color:var(--text-sub);margin-top:8px">
+      旧版 <code>JetEngineAfterburningScript</code> 不参与此部件的计算。
+    </p>
+  </div>
+
+  <div class="card">
+    <h3>可写状态字段（JetEngine.State）</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>字段</th><th>作用</th><th>备注</th></tr></thead>
+        <tbody>
+          <tr><td><code>burnerTemp</code></td><td>燃烧室目标温度 T04（K）</td><td>决定推力与质量的主旋钮</td></tr>
+          <tr><td><code>bypassRatio</code></td><td>涵道比 BPR</td><td>影响推力分配与油耗</td></tr>
+          <tr><td><code>compressionRatio</code></td><td>压气机总压比 CPR</td><td>影响热效率</td></tr>
+          <tr><td><code>turbinePressureRatio</code></td><td>涡轮压比</td><td>默认 1</td></tr>
+          <tr><td><code>size</code></td><td>尺寸倍率</td><td>默认 1</td></tr>
+          <tr><td><code>afterburner</code></td><td>是否允许加力</td><td>布尔</td></tr>
+          <tr><td><code>afterburnerThrottleStart</code></td><td>加力起始油门</td><td>读档钳制到 0.1–0.95</td></tr>
+          <tr><td><code>reverseThrust</code></td><td>反推</td><td>布尔</td></tr>
+          <tr><td><code>maxGimbalAngle</code> / <code>gimbalSpeed</code></td><td>矢量喷口权限与速度</td><td>—</td></tr>
+          <tr><td><code>fanStyle</code> / <code>inletConeStyle</code> / <code>nozzleStyle</code></td><td>外观与喷口能力</td><td>—</td></tr>
+          <tr><td><code>mass</code></td><td>质量</td><td>写 0 或缺省时由公式重算</td></tr>
+          <tr><td><code>nozzleLength</code></td><td>喷管长度</td><td>外观</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout amber">
+      <b>两个坑：</b><code>fanPressureRatio</code> 不在状态里保存（部件定义默认 1.5）；旧存档的 <code>afterburnerTemp</code> 已被忽略，实际加力温度 = <code>max(2200, burnerTemp+200)</code>。
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 2 -->
+<section id="s2">
+  <h2><span class="num">2</span>热力学循环（站位 0–8）</h2>
+  <p class="lead"><code>JetEngineMath.ProcessParams</code> 用固化常数求解简化涡扇循环，不含压气机/涡轮效率变量。</p>
+
+  <div class="card">
+    <h3>进气与压缩</h3>
+    <div class="formula"><span class="c">// 进气总温总压</span>
+<span class="k">T01</span> = T∞ · ( 1 + 0.2 · min(M,1.4)<span class="v">²</span> )
+<span class="k">ram</span> = M&gt;1 ? 1 − 0.075·(M−1)<span class="v">^1.35</span> : 1
+<span class="k">P01</span> = min( P∞ · ram · (T01/T∞)<span class="v">^3.5</span>, 200000 )
+
+<span class="c">// 风扇与压气机（指数 2/7 = 0.2857）</span>
+<span class="k">T02</span> = T01 · FPR<span class="v">^(2/7)</span>     <span class="k">P02</span> = P01 · FPR
+<span class="k">T03</span> = T02 · CPR<span class="v">^(2/7)</span>     <span class="k">P03</span> = P02 · CPR
+<span class="k">T04</span> = T03 + max( burnerTemp − T03, 1 )   <span class="c">// ≈ 燃烧室温度</span>
+<span class="k">P04</span> = P03 · TPR · <span class="v">0.88</span>              <span class="c">// 0.88 = 固化压力损失</span></div>
+  </div>
+
+  <div class="card">
+    <h3>涡轮、加力与喷管</h3>
+    <div class="formula"><span class="k">T08</span> = T02 · FPR<span class="v">^(2/7)</span>      <span class="k">P08</span> = P02
+<span class="k">T05</span> = max( T04 − T03 + T02 − BPR·(T08−T02), 1 )
+<span class="k">P05</span> = P04 · (T05/T04)<span class="v">^3.5</span>
+
+<span class="c">// 加力燃烧室（仅 ThrottleAfterburner &gt; 0）</span>
+<span class="k">ΔT_AB</span> = min( ABTemp, T05+700 ) − ( T05+200 )
+<span class="k">T06</span>  = T05 + ThrottleAfterburner · ΔT_AB
+<span class="k">T08</span>  = T06                         <span class="c">// 加力加热外涵</span>
+<span class="k">P06</span>  = P05                         <span class="c">// 无喷管总压损失模型</span></div>
+    <div class="callout purple">
+      <b>注意：</b>真实发动机加力只加热核心流，游戏里 <code>T08=T06</code> 把外涵也一起加热，这是简化模型的近似。
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 3 -->
+<section id="s3">
+  <h2><span class="num">3</span>推力、油耗与比冲</h2>
+  <p class="lead">核心流量由进气面积与压力比决定，推力按"核心+外涵"两股流分别计算后求和。</p>
+
+  <div class="card">
+    <h3>喷速与燃空比</h3>
+    <div class="formula"><span class="k">Ve_core</span> = SafeSqrt( 2009.0174 · T06 · (1−(p∞/P06)<span class="v">^(2/7)</span>) )
+<span class="k">Ve_fan</span>  = SafeSqrt( 2009.0174 · T08 · (1−(p∞/P08)<span class="v">^(2/7)</span>) )
+<span class="k">FAR</span>     = [4.5·(T06−T05) + (T04−T03)] / [42806.9956 − (T04+T06−T05)]
+<span class="k">Vinlet</span>  = M · sqrt( 401.8035 · T∞ )
+
+<span class="c">// 核心进气面积（来自 UpdatePerformance）</span>
+<span class="k">FanRadius</span>  = 0.5 · size · baseSize
+<span class="k">CoreEntry</span>  = max( 0.05, FanRadius − 0.09·min(size,1) )
+<span class="k">CoreArea</span>   = π · CoreEntry<span class="v">²</span> / (BPR+1)</div>
+  </div>
+
+  <div class="card">
+    <h3>质量流、推力与油耗</h3>
+    <div class="formula"><span class="k">Bflow</span> = min( 0.75·sqrt(T06/T01)/(P06/P01), 1 )
+<span class="k">k_flow</span> = sqrt(0.004878) · 1.2<span class="v">^-3</span> ≈ 0.04041
+<span class="k">m_core</span> = CoreArea · Bflow · P06 / sqrt(T06) · k_flow
+<span class="k">m_fan</span>  = BPR · m_core
+
+<span class="k">ThrustNet</span> = max(0, m_core·(Ve_core−Vinlet)) + max(0, m_fan·(Ve_fan−Vinlet))
+<span class="k">TSFC</span>      = FAR / SpecificThrust
+<span class="k">FuelFlow</span>  = TSFC · ThrustNet
+<span class="k">Isp</span>       = ThrustNet / (FuelFlow · 9.81)</div>
+    <div class="callout">
+      <b>RamDrag 只作诊断</b>，不再从净推力中扣除——进气动量损失已在 <code>(Ve − Vinlet)</code> 里体现。
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 4 -->
+<section id="s4">
+  <h2><span class="num">4</span>油门缩放与响应</h2>
+  <p class="lead">这是最容易误解的一环：热力学循环永远按满油门算，飞行中的油门只做下游缩放。</p>
+
+  <div class="card">
+    <h3>强制满油门</h3>
+    <div class="callout red">
+      <b><code>JetEngineData.UpdatePerformance</code> 把 Throttle 强制写为 1.0。</b> 所以 T04 永远是 burnerTemp，与操纵杆位置无关。
+    </div>
+    <div class="formula"><span class="c">// JetEngineScript.FlightFixedUpdateLocal</span>
+<span class="k">coreThrottle</span> = clamp( EngineThrottle / (有加力 ? afterburnerThrottleStart : 1), 0, 1 )
+<span class="k">scale</span>       = coreThrottle<span class="v">^2.5</span>
+
+<span class="k">thrustCurrent</span>   = ThrustNetScaled · scale     <span class="c">// ThrustNetScaled = ThrustNet·0.01 (kN)</span>
+<span class="k">fuelRate</span>        = FuelFlow · scale · 1.24378 <span class="c">// 质量流量→体积流量</span></div>
+  </div>
+
+  <div class="grid">
+    <div class="mini">
+      <div class="t">油门 → TSFC</div>
+      <div class="v">不变</div>
+      <div class="d">推力与油耗同比例缩放，比油耗恒定</div>
+    </div>
+    <div class="mini">
+      <div class="t">油门 → 推力</div>
+      <div class="v">^2.5</div>
+      <div class="d">油门 50% 时推力约 17.7%</div>
+    </div>
+    <div class="mini">
+      <div class="t">油门响应</div>
+      <div class="v">0.05/√r</div>
+      <div class="d">核心半径越大，油门响应越慢</div>
+    </div>
+    <div class="mini">
+      <div class="t">红外特征</div>
+      <div class="v">×10</div>
+      <div class="d">加力时 IR 签名放大到 10 倍</div>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 5 -->
+<section id="s5">
+  <h2><span class="num">5</span>质量公式与 baseSize 反推</h2>
+  <p class="lead">质量由几何经验式计算。用五架机的存档数值反推，确认军用部件的 baseSize 为 0.9。</p>
+
+  <div class="card">
+    <h3>质量经验式</h3>
+    <div class="formula"><span class="k">r</span>  = (0.5·size·baseSize) / sqrt(BPR+1)
+<span class="k">A</span>  = π·r<span class="v">²</span>
+<span class="k">l2</span> = 1 + max(0,(T4−1388)/2500)
+<span class="k">l3</span> = sqrt(max(0, BPR−1))
+<span class="k">l4</span> = 145·(1+1.4·l3)
+<span class="k">l5</span> = 360·(1+0.5·l3)·l2
+
+<span class="k">mass</span> = [ π·FanRadius<span class="v">²</span>·0.5·l4
+        + A·(3.276+0.1·CPR+0.1)·l5
+        + (有加力 ? A·2.364·150 : 0)
+        + A·2.155·250 ] · 0.01</div>
+  </div>
+
+  <div class="card">
+    <h3>反推验证：baseSize = 0.9</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>机型</th><th class="num">size</th><th class="num">BPR</th><th class="num">计算质量</th><th class="num">XML 质量</th></tr></thead>
+        <tbody>
+          <tr><td>F-16C</td><td class="num">1.22</td><td class="num">1.50</td><td class="num">18.232497</td><td class="num">18.2324963</td></tr>
+          <tr><td>F-16V</td><td class="num">1.23</td><td class="num">1.50</td><td class="num">19.399456</td><td class="num">19.399456</td></tr>
+          <tr><td>F-35A</td><td class="num">1.50</td><td class="num">0.57</td><td class="num">34.676956</td><td class="num">34.6769562</td></tr>
+          <tr><td>SU-57</td><td class="num">1.20</td><td class="num">0.71</td><td class="num">20.430640</td><td class="num">20.43064</td></tr>
+          <tr><td>J-20A</td><td class="num">1.24</td><td class="num">0.25</td><td class="num">29.582459</td><td class="num">29.5824585</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout green">
+      <b>结论：</b>五架机全部逐位吻合。军用发动机的 <code>FanRadius = 0.45·size</code>，<strong>风扇直径 = 0.9·size</strong>。
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 6 -->
+<section id="s6">
+  <h2><span class="num">6</span>调校要点与常见误区</h2>
+
+  <div class="card">
+    <h3>参数影响</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>参数</th><th>提高的收益</th><th>代价 / 约束</th></tr></thead>
+        <tbody>
+          <tr><td><code>bypassRatio</code></td><td>风扇推力占比↑，巡航 SFC 更优</td><td>核心流量↓，核心推力下降</td></tr>
+          <tr><td><code>compressionRatio</code></td><td>热效率↑、核心推力↑</td><td>T03 抬升，收益非线性</td></tr>
+          <tr><td><code>burnerTemp</code></td><td>推力主旋钮</td><td>质量按 (T4−1388)/2500 增长</td></tr>
+          <tr><td><code>size</code></td><td>面积、流量、推力近似平方增长</td><td>质量与迎风阻力同步上升，SFC 不变</td></tr>
+          <tr><td><code>afterburner</code></td><td>加力推力↑、IR 特征 ×10</td><td>油耗剧增、质量增加</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>高频误区</h3>
+    <div class="step"><div class="n">1</div><div class="c"><strong>改油门调不动推力</strong>——循环按满油门算，真正生效的是脚本里的 <code>coreThrottle^2.5</code>。</div></div>
+    <div class="step"><div class="n">2</div><div class="c"><strong>写 afterburnerTemp 无效</strong>——新代码不读它，加力温度由 burnerTemp 推出。</div></div>
+    <div class="step"><div class="n">3</div><div class="c"><strong>fanPressureRatio 改了不保存</strong>——它在部件定义里，状态 XML 不含该字段。</div></div>
+    <div class="step"><div class="n">4</div><div class="c"><strong>压缩比 24 不是上限</strong>——存档中已出现 28.5 与 30，设计器上限由部件定义决定。</div></div>
+    <div class="step"><div class="n">5</div><div class="c"><strong>设计器按 0 键</strong>可输出全部站位热力数据（T01–T08、P01–P08、推力、油耗、质量、TSFC），是最快的校准手段。</div></div>
+  </div>
+</section>
+
+<!-- SECTION 7 -->
+<section id="s7">
+  <h2><span class="num">7</span>最终推荐配比</h2>
+  <p class="lead">约束：直径 ≤ 1.35 m、涵道比 ≤ 1.50、压缩比 ≤ 24.0、燃烧室温度 ≤ 2250 K（设计器最大值）。</p>
+
+  <div class="hero">
+    <div class="box"><div class="lab">风扇直径</div><div class="val">1.125<span class="unit"> m</span></div></div>
+    <div class="box"><div class="lab">涵道比</div><div class="val">0.70</div></div>
+    <div class="box"><div class="lab">压缩比</div><div class="val">24.0<span class="unit"> x</span></div></div>
+    <div class="box"><div class="lab">燃烧室温度</div><div class="val">1800<span class="unit"> K</span></div></div>
+  </div>
+
+  <div class="card">
+    <h3>派生参数</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>项目</th><th class="num">数值</th></tr></thead>
+        <tbody>
+          <tr><td>size（尺寸倍率）</td><td class="num">1.25</td></tr>
+          <tr><td>核心直径</td><td class="num">0.839 m</td></tr>
+          <tr><td>计算质量</td><td class="num">20.44 kg</td></tr>
+          <tr><td>油门响应</td><td class="num">0.077 /s</td></tr>
+          <tr><td>加力温度</td><td class="num">2200 K</td></tr>
+          <tr><td>加力起始油门</td><td class="num">0.85</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>预测性能</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>工况</th><th class="num">推力</th><th class="num">油耗</th><th class="num">SFC</th></tr></thead>
+        <tbody>
+          <tr><td>海平面静止 · 干</td><td class="num">94.8 kN</td><td class="num">1.67 kg/s</td><td class="num">63.5 kg/kN·h</td></tr>
+          <tr><td>海平面静止 · 加力</td><td class="num">128.0 kN</td><td class="num">5.29 kg/s</td><td class="num">148.7 kg/kN·h</td></tr>
+          <tr><td>M0.85 / 10 km 巡航</td><td class="num">34.6 kN</td><td class="num">0.82 kg/s</td><td class="num">85.0 kg/kN·h</td></tr>
+          <tr><td>M1.6 / 12 km 冲刺</td><td class="num">62.0 kN</td><td class="num">2.97 kg/s</td><td class="num">172.6 kg/kN·h</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout amber">
+      <b>加力比 1.35</b>，推重比约 4.64 kN/kg。SFC 单位为 kg/(kN·h)，数值越低越省油。
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>可直接使用的状态片段</h3>
+    <div class="xml">&lt;JetEngine.State burnerTemp="1800" afterburnerThrottleStart="0.85"
+  afterburnerBaseColor="75B0FFFF" afterburnerTipColor="FF80007F"
+  bypassRatio="0.7" compressionRatio="24" afterburner="true"
+  reverseThrust="true" size="1.25" turbinePressureRatio="1"
+  maxGimbalAngle="0" gimbalSpeed="0"
+  fanStyle="FanStraightCivilian" inletConeStyle="InletStator2"
+  nozzleStyle="NozzleMilitary2" mass="20.43670912" nozzleLength="1" /&gt;</div>
+    <div class="callout red">
+      <b>注意：</b>写入存档后需同步修改对应的 <code>__editor__.xml</code>，否则设计器里显示的仍是旧值。
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>为什么这组数值均衡</h3>
+    <ul>
+      <li><strong>涵道比 0.70</strong>：偏低但不极端，超音速单位推力好，巡航 SFC 仍可接受。</li>
+      <li><strong>压缩比 24.0</strong>：接近设计器上限，热效率高但不越界。</li>
+      <li><strong>燃烧室温度 1800 K</strong>：质量与推力的折中点，继续升高会显著增重并恶化油耗。</li>
+      <li><strong>直径 1.125 m</strong>：单发中型机适用，再大会增加迎风阻力与结构重量。</li>
+    </ul>
+    <div class="callout green">
+      <b>若追求极限推力：</b>可转向 size 1.4 / BPR 0.2 / CPR 14 / T4 1850，推力约 166 kN，但质量升至 31 kg、油耗与尺寸明显上升。本报告给出的是综合最优解。
+    </div>
+  </div>
+</section>
+
+<footer>
+  基于 Game.dll IL 反编译实证 · 本报告仅作游戏机制分析，未修改任何游戏文件<br>
+  生成于 2026-11-25 · SimplePlanes 2 载具魔改项目
+</footer>
+
+</div>
+</body>
+</html>

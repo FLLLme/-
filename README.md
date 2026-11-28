@@ -59,6 +59,11 @@ http://127.0.0.1:8080
 │   ├─ friend-frame.png          朋友章首位的花卉边框（抠自设计稿）
 │   └─ friend-bloom.png          其中的朱砂红彼岸花（单独成层，见下文）
 │
+├─ sandbox/                沙盒造物笔记子站点
+│   ├─ index.html              子站入口（列表页）
+│   ├─ list.js                 读取 posts/sandbox.json 渲染列表
+│   └─ notes/                  上传的 HTML 原样存放
+│
 ├─ static/
 │   └─ images/uploads/     后台插入的图片（首次上传时自动创建）
 │
@@ -297,6 +302,59 @@ python tools/sync_extras.py
 这边为空是**合法状态**，规则正好相反。
 
 ---
+
+## 三·六、沙盒造物笔记（HTML 文档）
+
+首页导航里有一栏「**沙盒造物笔记**」，点进去是一个**独立子站点**
+（`sandbox/index.html`），里面存放自成体系的 HTML 文档 —— 目前是 SimplePlanes 2
+的反编译与数值拟合笔记。
+
+子站点刻意沿用了那些文档自身的冷灰 + 蓝主色视觉，而不是主站的暖白朱砂：
+它是一处"另一个空间"，进门后风格统一比与主站一致更重要。
+
+### 怎么加一篇
+
+后台 → **沙盒造物笔记** → 新建 → 上传 `.html` → 保存。
+保存后会自动提交到仓库，CI 汇总目录，几十秒后出现在子站列表里。
+
+列表里显示的名字**直接取文件名**（去掉 `.html`），不需要另填标题 —— 传什么文件名，
+页面上就叫什么。
+
+### 为什么文件与索引记录是分开的
+
+一条后台记录（`content/sandbox/xxx.json`）里只保存 HTML 的**路径**，
+HTML 原样放在 `sandbox/notes/`。
+
+不能把 HTML 本身当作 Decap 的条目文件：那条目需要 front matter（用 `---` 包起来的头部），
+而**带 front matter 的 HTML 被浏览器直接打开时，那几行会被当作正文渲染出来**，
+排版当场坏掉。所以文件保持可直接打开的原样，另用一条记录做索引。
+
+### 数据流向
+
+```
+后台上传 HTML  →  sandbox/notes/xxx.html          （原样存放，可直接打开）
+               →  content/sandbox/xxx.json        （记录：只存路径与排序）
+                        │
+                        │  推送触发 sync-content.yml
+                        ▼
+                  posts/sandbox.json                 （汇总清单，含从文件名推导的标题）
+                        │
+                        ▼
+                  sandbox/index.html 读取并渲染列表
+```
+
+### 两点注意
+
+**不要给这些 HTML 加 front matter**，原因见上。它们就是普通网页。
+
+**本地预览子站点要用服务器**：`sandbox/list.js` 通过 `fetch` 读清单，
+直接用 `file://` 双击打开会被浏览器的同源策略拦掉（页面会显示明确提示）。
+用 `python server.py` 起服务后访问 `http://127.0.0.1:8080/sandbox/` 即可。
+
+### 容错
+
+`tools/sync_extras.py` 对空集合的处理与作品/友链一致：目录为空或不存在时
+写入 `[]`（子站显示"还没有笔记"），不会当成故障中止。
 
 ## 四、配置 Twikoo 评论
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-sync_extras.py — 把 content/works/ 与 content/friends/ 汇总为 posts/*.json
+sync_extras.py — 把 content/ 下的 works、friends、sandbox 汇总为 posts/*.json
 
 背景
 ----
@@ -13,6 +13,7 @@ sync_extras.py — 把 content/works/ 与 content/friends/ 汇总为 posts/*.jso
         ▼
     posts/works.json         前端只读，一次 fetch 拿全
     posts/friends.json
+    posts/sandbox.json
 
 为什么需要这一步
 ----------------
@@ -48,12 +49,15 @@ ROOT = Path(__file__).resolve().parent.parent
 ALLOWED_FIELDS = {
     "works":   ["title", "image", "href", "summary", "date", "order"],
     "friends": ["title", "url", "avatar", "desc", "order"],
+    # 沙盒笔记：只存文件路径与排序，显示名由文件名推导（见 title_from_file）
+    "sandbox": ["title", "file", "order"],
 }
 
 # 哪些字段是 URL，需要做协议检查
 URL_FIELDS = {
     "works":   ["image", "href"],
     "friends": ["avatar", "url"],
+    "sandbox": ["file"],
 }
 
 # 允许的协议。无协议的相对路径（本站图片都用相对路径）另行放行。
@@ -66,6 +70,7 @@ DANGEROUS_PROTOCOLS = ("javascript:", "vbscript:", "data:", "blob:", "filesystem
 COLLECTIONS = [
     ("works",   ROOT / "content" / "works",   ROOT / "posts" / "works.json"),
     ("friends", ROOT / "content" / "friends", ROOT / "posts" / "friends.json"),
+    ("sandbox", ROOT / "content" / "sandbox", ROOT / "posts" / "sandbox.json"),
 ]
 
 
@@ -128,6 +133,20 @@ def to_int(value):
         return None
 
 
+def title_from_file(value: str) -> str:
+    """从 HTML 文件路径推导显示名。
+
+    沙盒笔记不设「标题」字段 —— 用户在后台传完一个 .html，
+    想要的列表文字就是那个文件名本身，不必再手填一遍。
+    """
+    name = (value or "").strip().rstrip("/").rsplit("/", 1)[-1]
+    for ext in (".html", ".htm"):
+        if name.lower().endswith(ext):
+            name = name[: -len(ext)]
+            break
+    return name.strip()
+
+
 def normalize(name, data, fallback_title):
     """只保留白名单字段，并把除 order 外的值统一成字符串；URL 字段过协议白名单。"""
     item = {}
@@ -141,6 +160,10 @@ def normalize(name, data, fallback_title):
 
         text = "" if raw is None else str(raw).strip()
         item[key] = sanitize_url(text) if key in url_fields else text
+
+    # 沙盒笔记的显示名取文件名，覆盖掉上面按 JSON 文件名给的兜底值
+    if name == "sandbox":
+        item["title"] = title_from_file(item.get("file")) or fallback_title
 
     # 后台的文件夹集合强制要求 title 作为条目标识，但保险起见再兜一次，
     # 免得渲染出没有文字的卡片

@@ -10,7 +10,8 @@
   const state = {
     keyword: window.App.getQuery('q'),
     tag: window.App.getQuery('tag'),
-    posts: []
+    posts: [],
+    entered: false      // 入场动效是否已播过（只在首轮渲染触发）
   };
 
   /* ---------------- 启动 ---------------- */
@@ -258,13 +259,23 @@
     }
 
     const frag = document.createDocumentFragment();
-    list.forEach(p => frag.appendChild(createCard(p)));
+    list.forEach((p, i) => frag.appendChild(createCard(p, i)));
     grid.replaceChildren(frag);
+
+    /* 只在首次渲染时做入场：搜索框每敲一个字都会重渲染，
+       若每次都重放，输入时满屏卡片此起彼伏，很吵。 */
+    if (!state.entered) {
+      state.entered = true;
+      window.App.observeReveal(grid.querySelectorAll('.reveal'));
+    }
   }
 
-  function createCard(post) {
+  function createCard(post, index) {
     const card = document.createElement('article');
-    card.className = 'post-card';
+    card.className = 'post-card reveal';
+    /* --i 供 CSS 算交错延迟：第 n 张延后 n × 55ms。
+       只在首屏那一轮生效（见 render()），筛选用的是同一批元素就不必再动。 */
+    card.style.setProperty('--i', index);
     card.innerHTML = `
       <div class="post-cover"></div>
       <div class="post-card-body">

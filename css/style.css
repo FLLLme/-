@@ -1377,6 +1377,57 @@ main { display: block; }
   }
 }
 
+/* --------------------------------------------------------------------------
+   11. 动效：入场与下划线
+   --------------------------------------------------------------------------
+   参数集中在这里，想整体调快调慢只改这三个值。
+
+   缓动曲线用 cubic-bezier(.22, 1, .36, 1)：起步快、收尾极缓，观感"沉"，
+   适合以阅读为主的页面。参考实现里另一条弹性曲线 (.34, 1.56, .64, 1)
+   这里刻意不用 —— 那是"俏皮"的语言，与本站的克制调性不合。
+   -------------------------------------------------------------------------- */
+:root {
+  --motion-ease: cubic-bezier(.22, 1, .36, 1);
+  --motion-dur: 620ms;    /* 单张卡片的位移时长 */
+  --motion-step: 55ms;    /* 相邻卡片的延迟差 */
+}
+
+/* 卡片入场。
+   初始隐藏态只写在 .reveal 上，而 .reveal 是 JS 创建卡片时加上的 ——
+   JS 不跑就没有这些卡片，因此不存在"禁用脚本后内容永久不可见"的风险。
+   如果用服务端渲染的静态 HTML 承载这个隐藏态，那就是另一种故事了。 */
+.reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity var(--motion-dur) var(--motion-ease),
+    transform var(--motion-dur) var(--motion-ease);
+  transition-delay: calc(var(--i, 0) * var(--motion-step));
+}
+.reveal.in {
+  opacity: 1;
+  transform: none;
+}
+
+/* 导航项悬停：自左向右展开的下划线。
+   用 background 而不是伪元素 —— ::before 已被斜杠分隔占用，::after 被选中态占用。
+   移开时 background-position 回到右端，于是"从左长出、往右收走"，
+   比单纯淡出更有方向感。 */
+.nav a:not(.active) {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-repeat: no-repeat;
+  background-position: 100% 100%;
+  background-size: 0% 1px;
+  transition:
+    color .2s,
+    background-size .42s var(--motion-ease),
+    background-position .42s var(--motion-ease);
+}
+.nav a:not(.active):hover {
+  background-size: 100% 1px;
+  background-position: 0 100%;
+}
+
 @media print {
   .site-header, .site-footer, .aside-back, #tocAside,
   .ai-fab, .ai-drawer, .reading-progress, .article-actions,

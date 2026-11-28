@@ -231,6 +231,43 @@
      因此需要根据当前滚动位置判断该高亮哪一项（主色文字 + 下划线），
      而不是固定挂在「首页」上。点击时也立即切换，避免等待滚动。
      仅在首页调用；详情页的选中态由 renderHeader('posts') 固定。 */
+  /* ---------------- 入场动效 ----------------
+     只作用于「由 JS 创建」的元素（文章卡片）。
+
+     这个前提很重要：如果把初始的 opacity:0 写在服务端渲染的静态 HTML 上，
+     一旦 JS 失败，内容就永远不可见。而这里的元素本来就是 JS 建出来的，
+     JS 不跑就没有这些元素，所以可以放心地把隐藏态写在 CSS 里。
+
+     动效只播一次，播完即 unobserve —— 长列表来回滚动不会反复闪。
+
+     IntersectionObserver 的 rootMargin 底部留 -10%：
+     卡片要真正进入视口一段距离才算"看到"，避免刚露出 1px 就触发，
+     那样滚动很快时看起来像没动。 */
+  let revealIO = null;
+
+  function observeReveal(nodes) {
+    const els = Array.from(nodes || []);
+    if (!els.length) return;
+
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce || !('IntersectionObserver' in window)) {
+      els.forEach(el => el.classList.add('in'));
+      return;
+    }
+
+    if (!revealIO) {
+      revealIO = new IntersectionObserver(entries => {
+        entries.forEach(en => {
+          if (!en.isIntersecting) return;
+          en.target.classList.add('in');
+          revealIO.unobserve(en.target);
+        });
+      }, { threshold: 0.12, rootMargin: '0px 0px -10% 0px' });
+    }
+
+    els.forEach(el => revealIO.observe(el));
+  }
+
   /* 是否已经绑过滚动监听。
      为什么需要「可重绑」：首页顶栏在启动时渲染，那时作品集/朋友章数据还没到，
      所以「友链」项当时不满足显示条件；数据到达后会重渲染一次顶栏把它补上。
@@ -322,6 +359,6 @@
     $, $$, escapeHtml, escapeAttr, stripMarkdown, readingTime,
     formatDate, formatDateShort, getQuery,
     ICONS, initTheme, setTheme, toggleTheme,
-    renderHeader, renderFooter, showOfflineNotice, bindNavSpy
+    renderHeader, renderFooter, showOfflineNotice, bindNavSpy, observeReveal
   };
 })();

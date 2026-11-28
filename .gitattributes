@@ -1,0 +1,21 @@
+# 统一使用 LF 换行。
+#
+# 这不是风格偏好，是功能要求：CSP 的 script-src 用 SHA-256 哈希放行
+# 内联脚本（index.html / post.html 里的主题预设），而哈希是按**字节**算的。
+# 一旦工作区文件被转成 CRLF，脚本内容就变了，哈希随之失效 ——
+# 强制模式下该脚本会被静默拒绝执行，症状只是暗色模式闪一下白，
+# 极难联想到是换行符导致的。
+#
+# 所以：所有文本文件强制 LF，任何人 checkout 都不会被本地 git 的
+# core.autocrlf 设置影响。
+* text=auto eol=lf
+
+# 二进制文件不做换行处理
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.woff binary
+*.woff2 binary
+*.ttf  binary

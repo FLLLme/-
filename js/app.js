@@ -231,7 +231,17 @@
      因此需要根据当前滚动位置判断该高亮哪一项（主色文字 + 下划线），
      而不是固定挂在「首页」上。点击时也立即切换，避免等待滚动。
      仅在首页调用；详情页的选中态由 renderHeader('posts') 固定。 */
+  /* 是否已经绑过滚动监听。
+     为什么需要「可重绑」：首页顶栏在启动时渲染，那时作品集/朋友章数据还没到，
+     所以「友链」项当时不满足显示条件；数据到达后会重渲染一次顶栏把它补上。
+     而 bindNavSpy 的闭包里握着 nav 链接的旧引用，重渲染后那些节点已从文档里移除 ——
+     不先摘掉旧监听，滚动高亮就会作用在孤儿节点上，看起来像"高亮坏了"。 */
+  let navSpyOff = null;
+
   function bindNavSpy() {
+    /* 先摘掉上一轮的监听（见上方 navSpyOff 的说明） */
+    if (navSpyOff) navSpyOff();
+
     const nav = $('#siteHeader .nav');
     if (!nav) return;
 
@@ -298,6 +308,12 @@
 
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onScroll);
+    /* 记下摘除方式，供下一次 bindNavSpy 调用先清理掉这一轮 */
+    navSpyOff = () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+      navSpyOff = null;
+    };
     update();
   }
 

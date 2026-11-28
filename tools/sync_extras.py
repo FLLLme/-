@@ -161,6 +161,13 @@ def normalize(name, data, fallback_title):
         text = "" if raw is None else str(raw).strip()
         item[key] = sanitize_url(text) if key in url_fields else text
 
+    # 朋友章在后台用的是 name 字段（见 config.yml 的 identifier_field），
+    # 而前端统一读 title。白名单里没有 name，于是标题退化成 JSON 文件名，
+    # 页面上显示成「星空驿站-starlight-station」而不是「星空驿站 Starlight Station」。
+    # 这里把 name 映射到 title，输出 schema 不变，前端无需改动。
+    if name == "friends":
+        item["title"] = str(data.get("name") or "").strip() or fallback_title
+
     # 沙盒笔记的显示名取文件名，覆盖掉上面按 JSON 文件名给的兜底值
     if name == "sandbox":
         item["title"] = title_from_file(item.get("file")) or fallback_title

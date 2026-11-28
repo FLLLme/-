@@ -141,6 +141,17 @@
       ]);
       this.works = works;
       this.friends = friends;
+
+      /* 同步回写到配置对象。
+         顶栏（app.js 的 renderHeader）与作品集区块判定读的都是 CFG.works / CFG.friends，
+         而这里原先只写了 Store 上的副本 —— 两个对象从未打通，
+         于是「友链」这个依赖 CFG.friends 非空的导航项永远不满足条件，从未显示过。
+         图片链接在同一次渲染里也只认 CFG，所以两边必须一致。 */
+      if (typeof CFG === 'object' && CFG) {
+        CFG.works = works;
+        CFG.friends = friends;
+      }
+
       return { works, friends };
     }
   };

@@ -17,6 +17,12 @@
     window.App.renderHeader('posts');
     window.App.renderFooter();
 
+    /* 顶栏里的「友链」项依赖 CFG.friends 非空，而文章页原先从不加载这份数据，
+       导致同一个导航在首页与文章页少一项 —— 两页之间来回点会看到导航"抖动"。
+       这里补一次加载（很小的 JSON），数据到了再重渲染顶栏即可。
+       不 await：不影响正文渲染，也不阻塞首屏。 */
+    window.Store.loadExtras().then(() => window.App.renderHeader('posts'));
+
     // 静态按钮图标
     $('#copyLinkBtn').innerHTML = ICONS.copy + '<span>复制链接</span>';
     $('#askAiBtn').innerHTML = ICONS.sparkles + '<span>用 AI 提问本文</span>';

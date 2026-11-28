@@ -59,6 +59,13 @@
     const { works, friends } = await window.Store.loadExtras();
     renderWorks(works);
     renderFriends(friends);
+
+    /* 顶栏在 DOMContentLoaded 时就渲染好了，那一刻作品集/朋友章数据还没到 ——
+       「友链」项的显示条件是 friends 非空，于是它从未出现在导航里。
+       数据齐了在这里补渲染一次，导航才完整。
+       bindNavSpy 内部会先摘掉上一轮的监听，所以重复调用是安全的。 */
+    window.App.renderHeader('home');
+    window.App.bindNavSpy();
   }
 
   function renderWorks(list) {

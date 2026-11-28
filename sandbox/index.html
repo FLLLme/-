@@ -6,73 +6,126 @@
 <title>沙盒造物笔记 · 未见花</title>
 <meta name="description" content="SimplePlanes 2 的反编译与数值拟合笔记">
 <style>
-/* 视觉上刻意沿用这三份文档自己的设计体系（冷灰底 + 蓝主色 + 紫蓝渐变头图），
-   而不是主站的暖白朱砂 —— 「沙盒造物笔记」是一个独立的子站点，
-   落地页与文档保持一致才是一体的，从主站跳进来才有"进入另一个空间"的感觉。 */
+/* ==========================================================================
+   两套颜色刻意并存，各管一块：
+
+   · --m-* 是主站的暖白 / 朱砂红，只用于顶部导航栏 —— 让这一栏与主站完全一致，
+     读者一眼就知道还在「未见花」里；
+   · 下面的冷灰 / 蓝主色沿用这三篇文档自身的设计，只用于正文区。
+
+   导航是「站点外框」，正文是「文档内容」。两者分工明确，比强行统一一套配色更耐看。
+   ========================================================================== */
 :root{
+  /* 主站令牌（与 css/style.css 的 :root 逐一对应） */
+  --m-bg:#FAFAFA; --m-text:#333333; --m-line:#E5E5E5; --m-accent:#DC143C;
+  --m-text-soft:#6E6E6E; --m-header-h:68px; --m-wrap:1060px;
+
+  /* 文档令牌（与三篇笔记的 :root 一致） */
   --bg:#f5f6f8; --surface:#ffffff; --surface-alt:#f0f2f5;
   --text:#1f2329; --text-sub:#555e6b; --text-mute:#8a929c;
   --border:#e2e5ea; --accent:#2563eb; --accent-soft:#eaf1ff;
   --radius:12px; --shadow:0 1px 3px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.04);
 }
 *{box-sizing:border-box;margin:0;padding:0}
+
+/* ---------- 顶部导航：逐项照抄主站 .site-header ---------- */
+.mh{
+  position:sticky; top:0; z-index:60;
+  background:rgba(250,250,250,.86);
+  backdrop-filter:saturate(1.6) blur(14px);
+  -webkit-backdrop-filter:saturate(1.6) blur(14px);
+  border-bottom:1px solid var(--m-line);
+}
+.mh-inner{
+  max-width:var(--m-wrap); margin:0 auto; padding:0 24px;
+  display:flex; align-items:center; gap:20px; height:var(--m-header-h);
+}
+.mbrand{display:inline-flex; align-items:center; gap:10px; flex:none; text-decoration:none}
+.mbrand-mark{display:inline-flex; flex:none; width:26px; height:26px; color:var(--m-accent)}
+.mbrand-mark svg{width:100%; height:100%}
+.mbrand-name{
+  font-family:"Kaiti SC","STKaiti","KaiTi","楷体",Georgia,serif;
+  font-size:20px; font-weight:500; letter-spacing:.1em; line-height:1;
+  color:var(--m-text); transition:color .2s;
+}
+.mbrand:hover .mbrand-name{color:var(--m-accent)}
+
+.mnav{display:flex; align-items:center; margin-left:auto}
+.mnav a{
+  position:relative; padding:6px 13px; font-size:14.5px; color:var(--m-text-soft);
+  text-decoration:none; transition:color .2s;
+}
+.mnav a:hover{color:var(--m-text)}
+.mnav a:not(:first-child)::before{
+  content:'/'; position:absolute; left:-3px; color:var(--m-line); pointer-events:none;
+}
+.mnav a.active{color:var(--m-accent)}
+.mnav a.active::after{
+  content:''; position:absolute; left:13px; right:13px; bottom:-3px;
+  height:1.5px; background:var(--m-accent);
+}
+
+/* ---------- 正文区：沿用文档的冷灰体系 ---------- */
 body{
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
   background:var(--bg); color:var(--text); line-height:1.75; font-size:15px;
   -webkit-font-smoothing:antialiased; padding-bottom:60px;
 }
-.wrap{max-width:920px;margin:0 auto;padding:0 20px}
+.wrap{max-width:920px; margin:0 auto; padding:0 20px}
 
-header{
-  background:linear-gradient(135deg,#7c3aed,#2563eb); color:#fff;
-  padding:46px 0 40px; margin-bottom:28px;
-}
-header .wrap{display:flex;flex-direction:column;gap:8px}
-header h1{font-size:30px;font-weight:700;letter-spacing:.5px;line-height:1.3}
-header .sub{font-size:14px;opacity:.85;font-weight:400}
-header .tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
-header .tag{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.25);
-  padding:4px 11px;border-radius:20px;font-size:12px}
+.pagehead{padding:34px 0 18px}
+.pagehead h1{font-size:26px; font-weight:700; letter-spacing:.3px; line-height:1.35; color:var(--text)}
+.pagehead .sub{font-size:13.5px; color:var(--text-sub); margin-top:6px}
+.pagehead .tags{display:flex; flex-wrap:wrap; gap:7px; margin-top:12px}
+.pagehead .tag{background:var(--accent-soft); border:1px solid #cfe0ff; color:var(--accent);
+  padding:3px 10px; border-radius:20px; font-size:12px}
 
-/* 返回主站：与文档里的章节药丸同一套样式，放在最前面 */
-.back{display:inline-flex;align-items:center;gap:6px;margin-bottom:20px;
-  color:var(--accent);text-decoration:none;font-size:13px;padding:6px 13px;
-  border-radius:8px;background:var(--accent-soft);transition:.15s}
-.back:hover{background:var(--accent);color:#fff}
-
-.intro{color:var(--text-sub);font-size:14px;margin-bottom:20px}
+.intro{color:var(--text-sub); font-size:14px; margin-bottom:18px}
 
 /* 笔记列表 */
-.notes{list-style:none;display:flex;flex-direction:column;gap:12px}
-.note{display:block;text-decoration:none;color:inherit;background:var(--surface);
-  border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);
-  padding:18px 22px;transition:transform .15s,box-shadow .15s,border-color .15s;
-  position:relative;overflow:hidden}
-.note::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
-  background:var(--accent);transform:scaleY(0);transform-origin:top;transition:transform .2s}
-.note:hover{transform:translateY(-2px);border-color:#cfe0ff;
+.notes{list-style:none; display:flex; flex-direction:column; gap:12px}
+.note{display:block; text-decoration:none; color:inherit; background:var(--surface);
+  border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow);
+  padding:18px 22px; transition:transform .15s,box-shadow .15s,border-color .15s;
+  position:relative; overflow:hidden}
+.note::before{content:''; position:absolute; left:0; top:0; bottom:0; width:3px;
+  background:var(--accent); transform:scaleY(0); transform-origin:top; transition:transform .2s}
+.note:hover{transform:translateY(-2px); border-color:#cfe0ff;
   box-shadow:0 2px 6px rgba(0,0,0,.07),0 10px 26px rgba(37,99,235,.10)}
 .note:hover::before{transform:scaleY(1)}
-.note .t{font-size:16px;font-weight:650;line-height:1.5;color:var(--text)}
-.note .meta{display:flex;align-items:center;gap:8px;margin-top:6px;
-  font-size:12px;color:var(--text-mute)}
-.note .kind{background:var(--surface-alt);border:1px solid var(--border);
-  padding:1px 7px;border-radius:5px;font-size:11px}
-.note .arrow{margin-left:auto;color:var(--accent);font-size:15px;opacity:0;transition:opacity .2s}
+.note .t{font-size:16px; font-weight:650; line-height:1.5; color:var(--text)}
+.note .meta{display:flex; align-items:center; gap:8px; margin-top:6px;
+  font-size:12px; color:var(--text-mute)}
+.note .kind{background:var(--surface-alt); border:1px solid var(--border);
+  padding:1px 7px; border-radius:5px; font-size:11px}
+.note .arrow{margin-left:auto; color:var(--accent); font-size:15px; opacity:0; transition:opacity .2s}
 .note:hover .arrow{opacity:1}
 
-/* 状态：加载中 / 空 / 失败 */
-.state{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
-  box-shadow:var(--shadow);padding:28px 24px;text-align:center;color:var(--text-mute);font-size:14px}
-.state b{display:block;color:var(--text-sub);font-size:15px;margin-bottom:4px}
+.state{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  box-shadow:var(--shadow); padding:28px 24px; text-align:center; color:var(--text-mute); font-size:14px}
+.state b{display:block; color:var(--text-sub); font-size:15px; margin-bottom:4px}
 
-footer{text-align:center;color:var(--text-mute);font-size:12px;margin-top:40px;
-  padding-top:20px;border-top:1px solid var(--border)}
-footer a{color:var(--text-sub);text-decoration:none;border-bottom:1px solid var(--border)}
+footer{text-align:center; color:var(--text-mute); font-size:12px; margin-top:36px;
+  padding-top:18px; border-top:1px solid var(--border)}
 
-@media(max-width:600px){
-  header{padding:32px 0 28px}
-  header h1{font-size:23px}
+/* ---------- 窄屏：与主站同一套处理方式 ---------- */
+@media(max-width:720px){
+  .mh-inner{padding:0 18px; height:60px}
+  .mbrand-name{font-size:18px; letter-spacing:.08em}
+  .mbrand-mark{width:23px; height:23px}
+  .mnav a{padding:6px 9px; font-size:13.5px}
+  .mnav a:not(:first-child)::before{left:-2px}
+  .mnav a.active::after{left:9px; right:9px}
+  /* 5 个标签在 375px 上放不平，改为不换行 + 横向滚动；
+     padding-bottom 是给选中下划线（定位在 bottom:-3px）留位置，
+     否则一加 overflow 就会被裁掉 */
+  .mnav{flex:0 1 auto; min-width:0; overflow-x:auto; overflow-y:hidden;
+    padding-bottom:5px; scrollbar-width:none; -ms-overflow-style:none}
+  .mnav::-webkit-scrollbar{display:none}
+  .mnav a{flex:0 0 auto; white-space:nowrap}
+
+  .pagehead{padding:26px 0 14px}
+  .pagehead h1{font-size:21px}
   .note{padding:15px 17px}
   .note .t{font-size:15px}
   body{font-size:14px}
@@ -81,20 +134,36 @@ footer a{color:var(--text-sub);text-decoration:none;border-bottom:1px solid var(
 </head>
 <body>
 
-<header>
-  <div class="wrap">
+<!-- 顶部导航与主站一致（暖白毛玻璃 / 楷体站名 / 斜杠分隔 / 朱砂红选中态）。
+     子站是纯浅色站点 —— 三篇文档本身没有深色模式，所以这里不放主题切换按钮：
+     放上去点了只会让导航变深、正文仍是浅色，反而是坏的。 -->
+<header class="mh">
+  <div class="mh-inner">
+    <a class="mbrand" href="../index.html">
+      <span class="mbrand-mark"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g transform="rotate(0 16 16)"><path d="M16 16C14.1 13.2 13.7 10.2 15.5 8.3C16.5 7.5 17.4 7.9 17.5 8.9" stroke-width="1.5"/></g><g transform="rotate(72 16 16)"><path d="M16 16C14.1 13.2 13.7 10.2 15.5 8.3C16.5 7.5 17.4 7.9 17.5 8.9" stroke-width="1.5"/></g><g transform="rotate(144 16 16)"><path d="M16 16C14.1 13.2 13.7 10.2 15.5 8.3C16.5 7.5 17.4 7.9 17.5 8.9" stroke-width="1.5"/></g><g transform="rotate(216 16 16)"><path d="M16 16C14.1 13.2 13.7 10.2 15.5 8.3C16.5 7.5 17.4 7.9 17.5 8.9" stroke-width="1.5"/></g><g transform="rotate(288 16 16)"><path d="M16 16C14.1 13.2 13.7 10.2 15.5 8.3C16.5 7.5 17.4 7.9 17.5 8.9" stroke-width="1.5"/></g><g transform="rotate(36 16 16)"><path d="M16 16C14.9 11.2 14.7 6.6 16.4 2.9" stroke-width="1.05"/><ellipse cx="16.5" cy="2.7" rx=".78" ry="1.35" fill="currentColor" stroke="none"/></g><g transform="rotate(108 16 16)"><path d="M16 16C14.9 11.2 14.7 6.6 16.4 2.9" stroke-width="1.05"/><ellipse cx="16.5" cy="2.7" rx=".78" ry="1.35" fill="currentColor" stroke="none"/></g><g transform="rotate(180 16 16)"><path d="M16 16C14.9 11.2 14.7 6.6 16.4 2.9" stroke-width="1.05"/><ellipse cx="16.5" cy="2.7" rx=".78" ry="1.35" fill="currentColor" stroke="none"/></g><g transform="rotate(252 16 16)"><path d="M16 16C14.9 11.2 14.7 6.6 16.4 2.9" stroke-width="1.05"/><ellipse cx="16.5" cy="2.7" rx=".78" ry="1.35" fill="currentColor" stroke="none"/></g><g transform="rotate(324 16 16)"><path d="M16 16C14.9 11.2 14.7 6.6 16.4 2.9" stroke-width="1.05"/><ellipse cx="16.5" cy="2.7" rx=".78" ry="1.35" fill="currentColor" stroke="none"/></g><circle cx="16" cy="16" r="1.5" fill="currentColor" stroke="none"/></svg></span>
+      <span class="mbrand-name">未见花</span>
+    </a>
+    <nav class="mnav" aria-label="站点导航">
+      <a href="../index.html">首页</a>
+      <a href="../index.html#worksSection">作品集</a>
+      <a href="../index.html#latest">文章</a>
+      <a href="index.html" class="active" aria-current="page">沙盒造物笔记</a>
+      <a href="../index.html#friendsSection">友链</a>
+      <a href="../index.html#about">关于</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="pagehead">
     <h1>沙盒造物笔记</h1>
-    <div class="sub">SimplePlanes 2 · 反编译实证与数值拟合</div>
+    <p class="sub">SimplePlanes 2 · 反编译实证与数值拟合</p>
     <div class="tags">
       <span class="tag">Game.dll 反编译</span>
       <span class="tag">推进系统</span>
       <span class="tag">气动与导弹</span>
     </div>
   </div>
-</header>
-
-<div class="wrap">
-  <a class="back" href="../index.html">← 返回未见花</a>
 
   <p class="intro" id="intro">下面是把游戏内机制拆开看过之后留下的笔记。</p>
 
@@ -102,9 +171,9 @@ footer a{color:var(--text-sub);text-decoration:none;border-bottom:1px solid var(
   <div class="state" id="state">正在读取目录…</div>
 
   <footer>
-    <p>笔记内容基于实测与反编译，随游戏版本可能失效。<a href="../index.html">回到主站</a></p>
+    <p>笔记内容基于实测与反编译，随游戏版本可能失效。</p>
   </footer>
-</div>
+</main>
 
 <script src="list.js"></script>
 </body>
